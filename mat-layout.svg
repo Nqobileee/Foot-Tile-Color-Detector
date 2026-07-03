@@ -1,0 +1,124 @@
+<svg width="1000" height="1140" viewBox="0 0 1000 1140" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="bgGrad" cx="50%" cy="45%" r="80%">
+      <stop offset="0%" stop-color="#161022"/>
+      <stop offset="100%" stop-color="#050308"/>
+    </radialGradient>
+
+    <radialGradient id="glowBlue" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#1CA7EC" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#1CA7EC" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glowRed" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#E31B4C" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#E31B4C" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glowGreen" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#1FAE4A" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#1FAE4A" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glowYellow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#F4D913" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#F4D913" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glowPurple" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#9B4DFF" stop-opacity="0.4"/>
+      <stop offset="100%" stop-color="#9B4DFF" stop-opacity="0"/>
+    </radialGradient>
+
+    <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="14" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <filter id="softGlow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <filter id="blurBig" x="-100%" y="-100%" width="300%" height="300%">
+      <feGaussianBlur stdDeviation="40"/>
+    </filter>
+
+    <linearGradient id="textGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#5FD4FF"/>
+      <stop offset="35%" stop-color="#9B4DFF"/>
+      <stop offset="70%" stop-color="#FF6B8B"/>
+      <stop offset="100%" stop-color="#F4D913"/>
+    </linearGradient>
+  </defs>
+
+  <!-- background -->
+  <rect width="1000" height="1140" fill="url(#bgGrad)"/>
+
+  <!-- colorful ambient glow blobs -->
+  <g filter="url(#blurBig)" opacity="0.85">
+    <circle cx="180" cy="180" r="230" fill="url(#glowBlue)"/>
+    <circle cx="850" cy="220" r="240" fill="url(#glowPurple)"/>
+    <circle cx="120" cy="620" r="230" fill="url(#glowRed)"/>
+    <circle cx="880" cy="640" r="240" fill="url(#glowGreen)"/>
+    <circle cx="500" cy="830" r="230" fill="url(#glowYellow)"/>
+    <circle cx="500" cy="480" r="300" fill="url(#glowPurple)" opacity="0.5"/>
+  </g>
+
+  <!-- subtle hex decorations -->
+  <g stroke="#3a4a5c" stroke-width="1.5" fill="none" opacity="0.55">
+    <polygon points="90,140 130,120 170,140 170,180 130,200 90,180"/>
+    <polygon points="850,180 890,160 930,180 930,220 890,240 850,220"/>
+    <polygon points="70,780 110,760 150,780 150,820 110,840 70,820"/>
+    <polygon points="870,760 910,740 950,760 950,800 910,820 870,800"/>
+  </g>
+  <g fill="#8aa0b8" opacity="0.7">
+    <circle cx="140" cy="330" r="2.5"/>
+    <circle cx="200" cy="290" r="1.8"/>
+    <circle cx="820" cy="300" r="2"/>
+    <circle cx="900" cy="360" r="2.5"/>
+    <circle cx="120" cy="700" r="2"/>
+    <circle cx="880" cy="700" r="2.2"/>
+  </g>
+
+  <!-- Layout grid: 3 columns x 3 rows, each cell 260px, centered -->
+  <!-- Center at x=500. Column edges: 240-500-760 (left col 240..500? use tile size 260) -->
+
+  <!-- TOP tile: blue -->
+  <g filter="url(#glow)">
+    <rect x="370" y="120" width="260" height="260" rx="6"
+          fill="#1CA7EC" stroke="#5FD4FF" stroke-width="4"/>
+  </g>
+
+  <!-- LEFT tile: red -->
+  <g filter="url(#glow)">
+    <rect x="80" y="410" width="260" height="260" rx="6"
+          fill="#E31B4C" stroke="#FF6B8B" stroke-width="4"/>
+  </g>
+
+  <!-- CENTER tile: white -->
+  <g filter="url(#softGlow)">
+    <rect x="370" y="410" width="260" height="260" rx="6"
+          fill="#F2F3F5" stroke="#FFFFFF" stroke-width="4"/>
+  </g>
+
+  <!-- RIGHT tile: green -->
+  <g filter="url(#glow)">
+    <rect x="660" y="410" width="260" height="260" rx="6"
+          fill="#1FAE4A" stroke="#5CE58C" stroke-width="4"/>
+  </g>
+
+  <!-- BOTTOM tile: yellow -->
+  <g filter="url(#glow)">
+    <rect x="370" y="700" width="260" height="260" rx="6"
+          fill="#F4D913" stroke="#FFF066" stroke-width="4"/>
+  </g>
+
+  <!-- Learniverse wordmark -->
+  <text x="500" y="1055" text-anchor="middle"
+        font-family="'Segoe UI', 'Helvetica Neue', Arial, sans-serif"
+        font-size="52" font-weight="700" letter-spacing="6"
+        fill="url(#textGrad)">LEARNIVERSE</text>
+</svg>

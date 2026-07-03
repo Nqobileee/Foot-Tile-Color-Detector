@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Learniverse — Foot Tile Color Detector</title>
+<style>
+  :root {
+    --blue:   #1CA7EC;
+    --red:    #E31B4C;
+    --green:  #1FAE4A;
+    --yellow: #F4D913;
+    --white:  #F2F3F5;
+    --bg1: #161022;
+    --bg2: #050308;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+    background: radial-gradient(circle at 50% 40%, var(--bg1), var(--bg2));
+    color: #cfd8e3;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100%;
+    padding: 12px;
+    gap: 12px;
+  }
+  h1 {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: 4px;
+    background: linear-gradient(90deg, #5FD4FF, #9B4DFF 35%, #FF6B8B 70%, #F4D913);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    text-transform: uppercase;
+  }
+  #banner {
+    width: 100%;
+    max-width: 640px;
+    border-radius: 14px;
+    padding: 18px 12px;
+    text-align: center;
+    font-size: 34px;
+    font-weight: 800;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: #fff;
+    background: #1c1530;
+    border: 2px solid #3a2f55;
+    transition: background .25s, color .25s, border-color .25s;
+    text-shadow: 0 1px 4px rgba(0,0,0,.45);
+  }
+  #stage {
+    position: relative;
+    width: 100%;
+    max-width: 640px;
+    border-radius: 14px;
+    overflow: hidden;
+    border: 2px solid #3a2f55;
+    background: #000;
+    line-height: 0;
+  }
+  #video, #overlay {
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+  #overlay {
+    position: absolute;
+    inset: 0;
+    height: 100%;
+    pointer-events: none;
+  }
+  #controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    max-width: 640px;
+  }
+  button {
+    font: inherit;
+    font-weight: 700;
+    padding: 12px 20px;
+    border-radius: 10px;
+    border: none;
+    cursor: pointer;
+    color: #fff;
+    background: linear-gradient(90deg, #7b3fe4, #1CA7EC);
+    letter-spacing: 1px;
+  }
+  button:disabled { opacity: .45; cursor: default; }
+  button.secondary { background: #2a2140; border: 1px solid #4a3b6e; }
+  label.toggle {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 14px; user-select: none; cursor: pointer;
+  }
+  #sens-wrap {
+    display: flex; align-items: center; gap: 8px; font-size: 13px;
+  }
+  #status {
+    font-size: 14px;
+    text-align: center;
+    max-width: 640px;
+    min-height: 20px;
+    color: #9fb0c3;
+  }
+  /* mini mat diagram */
+  #minimat {
+    display: grid;
+    grid-template-columns: repeat(3, 34px);
+    grid-template-rows: repeat(3, 34px);
+    gap: 4px;
+  }
+  .cell { border-radius: 6px; opacity: .35; transition: opacity .2s, box-shadow .2s; }
+  .cell.active { opacity: 1; box-shadow: 0 0 14px 3px currentColor; }
+  .cell.blue   { background: var(--blue);   color: var(--blue);   grid-area: 1 / 2; }
+  .cell.red    { background: var(--red);    color: var(--red);    grid-area: 2 / 1; }
+  .cell.white  { background: var(--white);  color: var(--white);  grid-area: 2 / 2; }
+  .cell.green  { background: var(--green);  color: var(--green);  grid-area: 2 / 3; }
+  .cell.yellow { background: var(--yellow); color: var(--yellow); grid-area: 3 / 2; }
+</style>
+</head>
+<body>
+  <h1>Learniverse</h1>
+
+  <div id="banner">Step on a tile</div>
+
+  <div id="stage">
+    <video id="video" autoplay playsinline muted></video>
+    <canvas id="overlay"></canvas>
+  </div>
+
+  <div id="controls">
+    <button id="startBtn">Start camera</button>
+    <button id="calBtn" class="secondary" disabled>Calibrate empty mat</button>
+    <label class="toggle"><input type="checkbox" id="voice" checked> Voice</label>
+    <div id="sens-wrap">
+      <span>Sensitivity</span>
+      <input type="range" id="sens" min="5" max="40" value="14">
+    </div>
+  </div>
+
+  <div id="minimat">
+    <div class="cell blue"></div>
+    <div class="cell red"></div>
+    <div class="cell white"></div>
+    <div class="cell green"></div>
+    <div class="cell yellow"></div>
+  </div>
+
+  <p id="status">Press “Start camera”, aim it so the whole mat is in view, then calibrate with no one standing on it.</p>
+
+<script>
+(() => {
+  'use strict';
+
+  // Tile palette from mat-layout.svg
+  const TILES = [
+    { name: 'blue',   hex: '#1CA7EC' },
+    { name: 'red',    hex: '#E31B4C' },
+    { name: 'green',  hex: '#1FAE4A' },
+    { name: 'yellow', hex: '#F4D913' },
+    { name: 'white',  hex: '#F2F3F5' },
+  ];
+  const NONE = -1;
+
+  // Processing resolution (kept small for speed; scaled up for the overlay)
+  const PW = 240;
+  let PH = 180; // recomputed from the video aspect ratio
+
+  const video   = document.getElementById('video');
+  const overlay = document.getElementById('overlay');
+  const octx    = overlay.getContext('2d');
+  const banner  = document.getElementById('banner');
+  const status  = document.getElementById('status');
+  const startBtn = document.getElementById('startBtn');
+  const calBtn   = document.getElementById('calBtn');
+  const voiceEl  = document.getElementById('voice');
+  const sensEl   = document.getElementById('sens');
+
+  const work = document.createElement('canvas');
+  const wctx = work.getContext('2d', { willReadFrequently: true });
+
+  let labels = null;        // Int8Array, per-pixel tile index from calibration (or NONE)
+  let tileCounts = null;    // pixels per tile at calibration time
+  let calibrated = false;
+
+  // Detection smoothing
+  let candidate = NONE, candidateFrames = 0, currentTile = NONE;
+  const STABLE_FRAMES = 4;      // consecutive frames before a switch counts
+  const SWITCH_MARGIN = 0.05;   // new tile must beat current by this occlusion fraction
+
+  // ---- color classification (HSV) ----------------------------------------
+  function classify(r, g, b) {
+    const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+    const v = mx / 255, d = mx - mn;
+    const s = mx === 0 ? 0 : d / mx;
+    if (v > 0.7 && s < 0.22) return 4;            // white
+    if (s < 0.32 || v < 0.18) return NONE;        // grey / dark floor
+    let h;
+    if (mx === r)      h = 60 * (((g - b) / d) % 6);
+    else if (mx === g) h = 60 * ((b - r) / d + 2);
+    else               h = 60 * ((r - g) / d + 4);
+    if (h < 0) h += 360;
+    if (h < 20 || h >= 330) return 1;             // red
+    if (h >= 35 && h < 72)  return 3;             // yellow
+    if (h >= 80 && h < 170) return 2;             // green
+    if (h >= 180 && h < 260) return 0;            // blue
+    return NONE;
+  }
+
+  // ---- camera --------------------------------------------------------------
+  async function startCamera() {
+    startBtn.disabled = true;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 } },
+        audio: false,
+      });
+      video.srcObject = stream;
+      await new Promise(res => video.onloadedmetadata = res);
+      await video.play();
+
+      PH = Math.round(PW * video.videoHeight / video.videoWidth);
+      work.width = PW; work.height = PH;
+      overlay.width = video.videoWidth;
+      overlay.height = video.videoHeight;
+
+      calBtn.disabled = false;
+      startBtn.textContent = 'Camera running';
+      setStatus('Aim at the whole mat (no feet on it) and press “Calibrate empty mat”.');
+      requestAnimationFrame(loop);
+    } catch (err) {
+      startBtn.disabled = false;
+      setStatus('Camera error: ' + err.message + ' — camera needs HTTPS or localhost.');
+    }
+  }
+
+  // ---- calibration -----------------------------------------------------------
+  function calibrate() {
+    wctx.drawImage(video, 0, 0, PW, PH);
+    const px = wctx.getImageData(0, 0, PW, PH).data;
+    labels = new Int8Array(PW * PH).fill(NONE);
+    tileCounts = new Array(TILES.length).fill(0);
+
+    for (let i = 0, p = 0; i < labels.length; i++, p += 4) {
+      const t = classify(px[p], px[p + 1], px[p + 2]);
+      labels[i] = t;
+      if (t !== NONE) tileCounts[t]++;
+    }
+
+    // Ignore tiles with almost no pixels (probably out of frame / misread)
+    const minPixels = PW * PH * 0.004;
+    const found = [];
+    for (let t = 0; t < TILES.length; t++) {
+      if (tileCounts[t] < minPixels) tileCounts[t] = 0;
+      else found.push(TILES[t].name);
+    }
+
+    if (found.length === 0) {
+      calibrated = false;
+      setStatus('No tiles found — get the mat fully in frame with good light, then calibrate again.');
+      return;
+    }
+    calibrated = true;
+    currentTile = candidate = NONE; candidateFrames = 0;
+    setBanner(NONE);
+    setStatus('Calibrated. Tiles found: ' + found.join(', ') + '. Step on a tile!');
+  }
+
+  // ---- main loop --------------------------------------------------------------
+  let lastProc = 0;
+  function loop(ts) {
+    requestAnimationFrame(loop);
+    if (ts - lastProc < 66) return; // ~15 fps processing
+    lastProc = ts;
+    if (!calibrated) return;
+
+    wctx.drawImage(video, 0, 0, PW, PH);
+    const px = wctx.getImageData(0, 0, PW, PH).data;
+
+    // For each calibrated tile pixel: does it still look like its tile color?
+    // Pixels that stopped matching are occluded (foot, leg, shadow).
+    const occluded = new Array(TILES.length).fill(0);
+    for (let i = 0, p = 0; i < labels.length; i++, p += 4) {
+      const t = labels[i];
+      if (t === NONE || tileCounts[t] === 0) continue;
+      if (classify(px[p], px[p + 1], px[p + 2]) !== t) occluded[t]++;
+    }
+
+    let best = NONE, bestFrac = 0;
+    const threshold = sensEl.value / 100; // slider: min fraction of tile covered
+    for (let t = 0; t < TILES.length; t++) {
+      if (tileCounts[t] === 0) continue;
+      const frac = occluded[t] / tileCounts[t];
+      if (frac >= threshold && frac > bestFrac) { best = t; bestFrac = frac; }
+    }
+
+    // Hysteresis: to displace the current tile, the newcomer must clearly beat it
+    if (best !== NONE && currentTile !== NONE && best !== currentTile) {
+      const curFrac = occluded[currentTile] / tileCounts[currentTile];
+      if (curFrac >= threshold && bestFrac < curFrac + SWITCH_MARGIN) best = currentTile;
+    }
+
+    if (best === candidate) candidateFrames++;
+    else { candidate = best; candidateFrames = 1; }
+
+    if (candidateFrames >= STABLE_FRAMES && candidate !== currentTile) {
+      currentTile = candidate;
+      setBanner(currentTile);
+      if (currentTile !== NONE && voiceEl.checked) speak(TILES[currentTile].name);
+    }
+
+    drawOverlay(px, occluded);
+  }
+
+  // ---- overlay rendering --------------------------------------------------------
+  const overlayScratch = document.createElement('canvas');
+  function drawOverlay(px, occluded) {
+    overlayScratch.width = PW; overlayScratch.height = PH;
+    const sctx = overlayScratch.getContext('2d');
+    const img = sctx.createImageData(PW, PH);
+    const out = img.data;
+
+    for (let i = 0, p = 0; i < labels.length; i++, p += 4) {
+      const t = labels[i];
+      if (t === NONE || tileCounts[t] === 0) continue;
+      const [r, g, b] = hexRgb(TILES[t].hex);
+      out[p] = r; out[p + 1] = g; out[p + 2] = b;
+      out[p + 3] = t === currentTile ? 150 : 45; // active tile tinted brighter
+    }
+    sctx.putImageData(img, 0, 0);
+
+    octx.clearRect(0, 0, overlay.width, overlay.height);
+    octx.imageSmoothingEnabled = false;
+    octx.drawImage(overlayScratch, 0, 0, overlay.width, overlay.height);
+  }
+
+  // ---- UI helpers ---------------------------------------------------------------
+  const cells = {};
+  document.querySelectorAll('#minimat .cell').forEach(c => {
+    cells[c.classList[1]] = c;
+  });
+
+  function setBanner(t) {
+    Object.values(cells).forEach(c => c.classList.remove('active'));
+    if (t === NONE) {
+      banner.textContent = 'Step on a tile';
+      banner.style.background = '#1c1530';
+      banner.style.color = '#cfd8e3';
+      banner.style.borderColor = '#3a2f55';
+      return;
+    }
+    const tile = TILES[t];
+    banner.textContent = tile.name;
+    banner.style.background = tile.hex;
+    banner.style.borderColor = tile.hex;
+    banner.style.color = (tile.name === 'white' || tile.name === 'yellow') ? '#222' : '#fff';
+    cells[tile.name].classList.add('active');
+  }
+
+  function speak(word) {
+    try {
+      speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(word);
+      u.rate = 0.95;
+      speechSynthesis.speak(u);
+    } catch (_) { /* speech not supported — banner still works */ }
+  }
+
+  function hexRgb(hex) {
+    const n = parseInt(hex.slice(1), 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  }
+
+  function setStatus(msg) { status.textContent = msg; }
+
+  startBtn.addEventListener('click', startCamera);
+  calBtn.addEventListener('click', calibrate);
+})();
+</script>
+</body>
+</html>
