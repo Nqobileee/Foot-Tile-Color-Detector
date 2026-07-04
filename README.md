@@ -38,6 +38,6 @@ fine) and camera permission; the pose model loads from TensorFlow.js on first us
 
 The original single-file, no-build-tool app that detects which colored tile
 ([mat-layout.svg](public/mat-layout.svg)) a foot is standing on via pixel-color
-occlusion (no ML) still works standalone — see
+occlusion (no ML) still works standalone — see..
 [legacy/foot-tile-color-detector.html](legacy/foot-tile-color-detector.html). Serve it
 directly (e.g. `npx serve legacy`) if you just need that tool.
