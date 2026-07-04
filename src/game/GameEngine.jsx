@@ -98,10 +98,6 @@ const GameEngine = forwardRef(function GameEngine(_props, ref) {
         const x = lane.idx * laneW;
         ctx.strokeStyle = 'rgba(255,255,255,0.08)';
         ctx.strokeRect(x, 0, laneW, h);
-        ctx.fillStyle = 'rgba(255,255,255,0.55)';
-        ctx.font = '12px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText(lane.name, x + laneW / 2, h - 6);
       });
 
       ctx.strokeStyle = '#5FD4FF';
@@ -119,7 +115,7 @@ const GameEngine = forwardRef(function GameEngine(_props, ref) {
         const x = note.laneIdx * laneW + laneW / 2;
         ctx.beginPath();
         ctx.arc(x, y, NOTE_RADIUS, 0, Math.PI * 2);
-        ctx.fillStyle = '#9B4DFF';
+        ctx.fillStyle = LANES[note.laneIdx].color;
         ctx.fill();
       }
     }
