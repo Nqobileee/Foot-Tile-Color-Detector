@@ -19,18 +19,26 @@ export const CV_ZONES = [
   { laneIdx: 3, box: { x0: 0.67, y0: 0.35, x1: 1.0, y1: 0.75 } }, // right
 ];
 
+// User-adjustable zoom for the CV zone grid, since how wide the physical mat
+// appears depends on camera placement. Scales each box toward/away from the
+// frame center (0.5, 0.5); scale < 1 shrinks the grid, > 1 grows it.
+export const ZONE_SCALE_DEFAULT = 1;
+export const ZONE_SCALE_MIN = 0.3;
+export const ZONE_SCALE_MAX = 2;
+
+export function scaledZoneBox(box, scale) {
+  return {
+    x0: 0.5 + (box.x0 - 0.5) * scale,
+    y0: 0.5 + (box.y0 - 0.5) * scale,
+    x1: 0.5 + (box.x1 - 0.5) * scale,
+    y1: 0.5 + (box.y1 - 0.5) * scale,
+  };
+}
+
 // Render loop / note timing
 export const SCROLL_SPEED_PX_PER_SEC = 180;
-export const HIT_LINE_Y = 0.85; // fraction of canvas height
 export const NOTE_RADIUS = 22;
 export const STEP_FLASH_DURATION_MS = 450; // how long the bottom lane flash + tick/cross lingers
-
-// Judging windows, in ms from the note's ideal hit time
-export const JUDGE_WINDOWS = {
-  perfect: 60,
-  good: 130,
-  miss: 200,
-};
 
 // Zone/step detection tuning (Layer 3)
 export const STEP_DETECTION = {

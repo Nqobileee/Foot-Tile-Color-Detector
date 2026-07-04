@@ -1,12 +1,13 @@
-import { CV_ZONES, STEP_DETECTION } from '../../game/constants.js';
+import { CV_ZONES, STEP_DETECTION, scaledZoneBox } from '../../game/constants.js';
 import { findKeypoint } from './poseModel.js';
 
 const ANKLE_NAMES = ['left_ankle', 'right_ankle'];
 
-function zoneForPoint(nx, ny) {
-  const zone = CV_ZONES.find(
-    ({ box }) => nx >= box.x0 && nx <= box.x1 && ny >= box.y0 && ny <= box.y1
-  );
+function zoneForPoint(nx, ny, scale) {
+  const zone = CV_ZONES.find(({ box }) => {
+    const b = scaledZoneBox(box, scale);
+    return nx >= b.x0 && nx <= b.x1 && ny >= b.y0 && ny <= b.y1;
+  });
   return zone ? zone.laneIdx : null;
 }
 
@@ -31,7 +32,8 @@ export function createZoneDetector(judgeLane) {
 
   // keypoints: MoveNet's 17 keypoints in video pixel coordinates.
   // videoWidth/videoHeight: dimensions to normalize against.
-  function update(keypoints, videoWidth, videoHeight, now) {
+  // zoneScale: current user-adjustable zoom for the zone grid (see constants.js).
+  function update(keypoints, videoWidth, videoHeight, now, zoneScale) {
     if (!keypoints) return;
 
     for (const name of ANKLE_NAMES) {
@@ -48,7 +50,7 @@ export function createZoneDetector(judgeLane) {
 
       const nx = kp.x / videoWidth;
       const ny = kp.y / videoHeight;
-      const zoneIdx = zoneForPoint(nx, ny);
+      const zoneIdx = zoneForPoint(nx, ny, zoneScale);
 
       const velocityY =
         state.prevY !== null && state.prevTs !== null

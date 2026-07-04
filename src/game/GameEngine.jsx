@@ -3,9 +3,7 @@ import {
   LANES,
   LANE_COUNT,
   SCROLL_SPEED_PX_PER_SEC,
-  HIT_LINE_Y,
   NOTE_RADIUS,
-  JUDGE_WINDOWS,
   STEP_FLASH_DURATION_MS,
 } from './constants.js';
 import { createJudgeLane } from './judgeLane.js';
@@ -34,11 +32,11 @@ const GameEngine = forwardRef(function GameEngine(_props, ref) {
       },
       onJudgement: ({ laneIdx, judgement, timestamp }) => {
         setLastJudgement(judgement);
-        const correct = judgement === 'perfect' || judgement === 'good';
+        const correct = judgement === 'hit';
         stepFlashRef.current[laneIdx] = { correct, timestamp };
         if (correct) {
           setCombo((c) => c + 1);
-          setScore((s) => s + (judgement === 'perfect' ? 100 : 60));
+          setScore((s) => s + 100);
         } else {
           setCombo(0);
         }
@@ -79,12 +77,12 @@ const GameEngine = forwardRef(function GameEngine(_props, ref) {
 
     function sweepMissedNotes(now) {
       notesRef.current = notesRef.current.filter((n) => {
-        const overdue = now - n.hitTime > JUDGE_WINDOWS.miss;
-        if (overdue) {
+        const offScreen = now > n.hitTime; // fell past the bottom edge unhit
+        if (offScreen) {
           setCombo(0);
           setLastJudgement('miss');
         }
-        return !overdue;
+        return !offScreen;
       });
     }
 
@@ -92,7 +90,6 @@ const GameEngine = forwardRef(function GameEngine(_props, ref) {
       const w = canvas.width;
       const h = canvas.height;
       const laneW = w / LANE_COUNT;
-      const hitLineY = h * HIT_LINE_Y;
 
       ctx.clearRect(0, 0, w, h);
       ctx.fillStyle = '#0b0715';
@@ -104,18 +101,10 @@ const GameEngine = forwardRef(function GameEngine(_props, ref) {
         ctx.strokeRect(x, 0, laneW, h);
       });
 
-      ctx.strokeStyle = '#5FD4FF';
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.moveTo(0, hitLineY);
-      ctx.lineTo(w, hitLineY);
-      ctx.stroke();
-      ctx.lineWidth = 1;
-
       const travel = travelTimeMs();
       for (const note of notesRef.current) {
         const progress = 1 - (note.hitTime - now) / travel;
-        const y = progress * hitLineY;
+        const y = progress * h;
         const x = note.laneIdx * laneW + laneW / 2;
         ctx.beginPath();
         ctx.arc(x, y, NOTE_RADIUS, 0, Math.PI * 2);
@@ -123,6 +112,7 @@ const GameEngine = forwardRef(function GameEngine(_props, ref) {
         ctx.fill();
       }
 
+      const bandY = h * 0.82;
       LANES.forEach((lane) => {
         const flash = stepFlashRef.current[lane.idx];
         if (!flash) return;
@@ -134,12 +124,12 @@ const GameEngine = forwardRef(function GameEngine(_props, ref) {
 
         ctx.globalAlpha = alpha;
         ctx.fillStyle = lane.color;
-        ctx.fillRect(x, hitLineY, laneW, h - hitLineY);
+        ctx.fillRect(x, bandY, laneW, h - bandY);
         ctx.globalAlpha = 1;
 
         const symbol = flash.correct ? '✓' : '✕';
         const cx = x + laneW / 2;
-        const cy = hitLineY + (h - hitLineY) / 2;
+        const cy = bandY + (h - bandY) / 2;
         ctx.font = 'bold 42px sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';

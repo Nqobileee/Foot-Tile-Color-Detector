@@ -1,8 +1,8 @@
-import { JUDGE_WINDOWS } from './constants.js';
-
 // Layer 4's single entry point for every input adapter (keyboard, gamepad,
-// FSR mat via keydown, or CV zone detection). None of them know about notes,
-// timing windows, or scoring — they just report "a hit happened in lane N".
+// FSR mat via keydown, or CV zone detection). None of them know about notes
+// or scoring — they just report "a hit happened in lane N". Any note
+// currently falling in that lane counts, regardless of where it is on
+// screen — stepping on the right color clears it instantly.
 //
 // getNotes/removeNote/onJudgement are injected by GameEngine so this module
 // stays pure and input-agnostic.
@@ -16,29 +16,14 @@ export function createJudgeLane({ getNotes, removeNote, onJudgement }) {
       return 'miss';
     }
 
-    let closest = candidates[0];
-    let closestDelta = Math.abs(closest.hitTime - now);
+    // Clear whichever note has been falling longest (closest to the bottom).
+    let target = candidates[0];
     for (const note of candidates) {
-      const delta = Math.abs(note.hitTime - now);
-      if (delta < closestDelta) {
-        closest = note;
-        closestDelta = delta;
-      }
+      if (note.spawnTime < target.spawnTime) target = note;
     }
 
-    let judgement;
-    if (closestDelta <= JUDGE_WINDOWS.perfect) judgement = 'perfect';
-    else if (closestDelta <= JUDGE_WINDOWS.good) judgement = 'good';
-    else if (closestDelta <= JUDGE_WINDOWS.miss) judgement = 'miss';
-    else judgement = null; // too far from any note — empty/whiffed hit
-
-    if (judgement !== null) {
-      removeNote(closest.id);
-      onJudgement({ laneIdx, judgement, note: closest, timestamp: now });
-      return judgement;
-    }
-
-    onJudgement({ laneIdx, judgement: 'miss', note: null, timestamp: now });
-    return 'miss';
+    removeNote(target.id);
+    onJudgement({ laneIdx, judgement: 'hit', note: target, timestamp: now });
+    return 'hit';
   };
 }

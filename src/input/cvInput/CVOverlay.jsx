@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { CV_ZONES, LANES } from '../../game/constants.js';
+import { CV_ZONES, LANES, ZONE_SCALE_DEFAULT, ZONE_SCALE_MIN, ZONE_SCALE_MAX, scaledZoneBox } from '../../game/constants.js';
 import { loadPoseModel, estimatePose } from './poseModel.js';
 import { createZoneDetector } from './zoneDetector.js';
 
@@ -11,6 +11,11 @@ export default function CVOverlay({ judgeLane }) {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const [status, setStatus] = useState('Loading pose model…');
+  const [zoneScale, setZoneScale] = useState(ZONE_SCALE_DEFAULT);
+  const zoneScaleRef = useRef(zoneScale);
+  useEffect(() => {
+    zoneScaleRef.current = zoneScale;
+  }, [zoneScale]);
 
   useEffect(() => {
     let stream;
@@ -44,8 +49,8 @@ export default function CVOverlay({ judgeLane }) {
         if (cancelled) return;
         const now = performance.now();
         const keypoints = await estimatePose(detector, video);
-        zoneDetector.update(keypoints, video.videoWidth, video.videoHeight, now);
-        drawOverlay(ctx, canvas.width, canvas.height, keypoints);
+        zoneDetector.update(keypoints, video.videoWidth, video.videoHeight, now, zoneScaleRef.current);
+        drawOverlay(ctx, canvas.width, canvas.height, keypoints, zoneScaleRef.current);
         raf = requestAnimationFrame(loop);
       }
       raf = requestAnimationFrame(loop);
@@ -68,11 +73,22 @@ export default function CVOverlay({ judgeLane }) {
         style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
       />
       <p style={{ fontSize: 13, opacity: 0.8 }}>{status}</p>
+      <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13 }}>
+        Zone size: {Math.round(zoneScale * 100)}%
+        <input
+          type="range"
+          min={ZONE_SCALE_MIN}
+          max={ZONE_SCALE_MAX}
+          step={0.05}
+          value={zoneScale}
+          onChange={(e) => setZoneScale(Number(e.target.value))}
+        />
+      </label>
     </div>
   );
 }
 
-function drawOverlay(ctx, w, h, keypoints) {
+function drawOverlay(ctx, w, h, keypoints, zoneScale) {
   ctx.clearRect(0, 0, w, h);
 
   ctx.lineWidth = 2;
@@ -80,10 +96,11 @@ function drawOverlay(ctx, w, h, keypoints) {
   ctx.font = '14px sans-serif';
   ctx.fillStyle = 'rgba(95,212,255,0.9)';
   for (const { laneIdx, box } of CV_ZONES) {
-    const x = box.x0 * w;
-    const y = box.y0 * h;
-    const bw = (box.x1 - box.x0) * w;
-    const bh = (box.y1 - box.y0) * h;
+    const b = scaledZoneBox(box, zoneScale);
+    const x = b.x0 * w;
+    const y = b.y0 * h;
+    const bw = (b.x1 - b.x0) * w;
+    const bh = (b.y1 - b.y0) * h;
     ctx.strokeRect(x, y, bw, bh);
     ctx.fillText(LANES[laneIdx].name, x + 6, y + 16);
   }
