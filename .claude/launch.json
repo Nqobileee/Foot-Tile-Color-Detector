@@ -2,9 +2,9 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "static",
+      "name": "dev",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["--yes", "serve", "-l", "4173", "."],
+      "runtimeArgs": ["--yes", "vite", "--port", "4173"],
       "port": 4173
     }
   ]

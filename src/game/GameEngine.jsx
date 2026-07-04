@@ -1,0 +1,157 @@
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import {
+  LANES,
+  LANE_COUNT,
+  SCROLL_SPEED_PX_PER_SEC,
+  HIT_LINE_Y,
+  NOTE_RADIUS,
+  JUDGE_WINDOWS,
+} from './constants.js';
+import { createJudgeLane } from './judgeLane.js';
+
+const SPAWN_INTERVAL_MS = 650;
+let noteIdSeq = 0;
+
+// Layer 4: React + Canvas rendering. Owns notes, scoring, and combo state.
+// Exposes judgeLane(laneIdx) via ref so any input adapter — keyboard, mat,
+// gamepad, or CV zone detection — can drive it identically.
+const GameEngine = forwardRef(function GameEngine(_props, ref) {
+  const canvasRef = useRef(null);
+  const notesRef = useRef([]);
+  const lastSpawnRef = useRef(0);
+  const [score, setScore] = useState(0);
+  const [combo, setCombo] = useState(0);
+  const [lastJudgement, setLastJudgement] = useState(null);
+
+  const judgeLaneRef = useRef(null);
+  if (!judgeLaneRef.current) {
+    judgeLaneRef.current = createJudgeLane({
+      getNotes: () => notesRef.current,
+      removeNote: (id) => {
+        notesRef.current = notesRef.current.filter((n) => n.id !== id);
+      },
+      onJudgement: ({ judgement }) => {
+        setLastJudgement(judgement);
+        if (judgement === 'perfect' || judgement === 'good') {
+          setCombo((c) => c + 1);
+          setScore((s) => s + (judgement === 'perfect' ? 100 : 60));
+        } else {
+          setCombo(0);
+        }
+      },
+    });
+  }
+
+  useImperativeHandle(ref, () => ({
+    judgeLane: (laneIdx) => judgeLaneRef.current(laneIdx),
+  }));
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    let raf;
+
+    function resize() {
+      canvas.width = canvas.clientWidth;
+      canvas.height = canvas.clientHeight;
+    }
+    resize();
+    window.addEventListener('resize', resize);
+
+    function travelTimeMs() {
+      return (canvas.height / SCROLL_SPEED_PX_PER_SEC) * 1000;
+    }
+
+    function spawnNote(now) {
+      const laneIdx = Math.floor(Math.random() * LANE_COUNT);
+      notesRef.current.push({
+        id: ++noteIdSeq,
+        laneIdx,
+        spawnTime: now,
+        hitTime: now + travelTimeMs(),
+        hit: false,
+      });
+    }
+
+    function sweepMissedNotes(now) {
+      notesRef.current = notesRef.current.filter((n) => {
+        const overdue = now - n.hitTime > JUDGE_WINDOWS.miss;
+        if (overdue) {
+          setCombo(0);
+          setLastJudgement('miss');
+        }
+        return !overdue;
+      });
+    }
+
+    function draw(now) {
+      const w = canvas.width;
+      const h = canvas.height;
+      const laneW = w / LANE_COUNT;
+      const hitLineY = h * HIT_LINE_Y;
+
+      ctx.clearRect(0, 0, w, h);
+      ctx.fillStyle = '#0b0715';
+      ctx.fillRect(0, 0, w, h);
+
+      LANES.forEach((lane) => {
+        const x = lane.idx * laneW;
+        ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+        ctx.strokeRect(x, 0, laneW, h);
+        ctx.fillStyle = 'rgba(255,255,255,0.55)';
+        ctx.font = '12px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(lane.name, x + laneW / 2, h - 6);
+      });
+
+      ctx.strokeStyle = '#5FD4FF';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(0, hitLineY);
+      ctx.lineTo(w, hitLineY);
+      ctx.stroke();
+      ctx.lineWidth = 1;
+
+      const travel = travelTimeMs();
+      for (const note of notesRef.current) {
+        const progress = 1 - (note.hitTime - now) / travel;
+        const y = progress * hitLineY;
+        const x = note.laneIdx * laneW + laneW / 2;
+        ctx.beginPath();
+        ctx.arc(x, y, NOTE_RADIUS, 0, Math.PI * 2);
+        ctx.fillStyle = '#9B4DFF';
+        ctx.fill();
+      }
+    }
+
+    function loop(ts) {
+      raf = requestAnimationFrame(loop);
+      if (!lastSpawnRef.current) lastSpawnRef.current = ts;
+      if (ts - lastSpawnRef.current >= SPAWN_INTERVAL_MS) {
+        lastSpawnRef.current = ts;
+        spawnNote(ts);
+      }
+      sweepMissedNotes(ts);
+      draw(ts);
+    }
+    raf = requestAnimationFrame(loop);
+
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener('resize', resize);
+    };
+  }, []);
+
+  return (
+    <div style={{ position: 'relative', width: '100%', maxWidth: 640 }}>
+      <canvas ref={canvasRef} style={{ width: '100%', height: 420, display: 'block' }} />
+      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 4px', fontSize: 14 }}>
+        <span>Score: {score}</span>
+        <span>Combo: {combo}</span>
+        <span>{lastJudgement ?? ''}</span>
+      </div>
+    </div>
+  );
+});
+
+export default GameEngine;

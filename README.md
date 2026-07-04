@@ -1,53 +1,43 @@
-# Foot-Tile-Color-Detector
+# Nutri-Step
 
-A camera web app for the **Learniverse** mat ([mat-layout.svg](mat-layout.svg)) that detects
-which colored tile a foot is standing on — blue (top), red (left), white (center),
-green (right), yellow (bottom) — and shows/speaks the color.
+A DDR-style rhythm game built per [architecture.md](architecture.md): an input-agnostic
+game engine that accepts hits from keyboard, a gamepad-style dance mat, an FSR mat
+(Arduino firmware emulating a keyboard), or a webcam via pose estimation — all funneled
+through a single `judgeLane(laneIdx)` call.
 
-## How it works
-
-1. **Calibrate** — with the mat empty and fully in the camera frame, the app classifies
-   every pixel by hue into one of the five tile colors and remembers where each tile is.
-2. **Detect** — each frame, it counts how many of each tile's pixels no longer match that
-   tile's color. A foot (skin, sock, shoe, plus its shadow) covers part of a tile, so that
-   tile's "occluded" fraction jumps. The most-occluded tile above the sensitivity threshold
-   wins, with a few frames of debouncing and hysteresis so the result doesn't flicker.
-
-No ML model, no dependencies — just `getUserMedia` + canvas pixel math in a single
-[index.html](index.html).
+```
+src/
+├── game/
+│   ├── GameEngine.jsx   # note spawner, scoring, combo, render loop
+│   ├── judgeLane.js     # shared hit-judging logic (input-agnostic)
+│   └── constants.js     # lane defs, speeds, thresholds
+├── input/
+│   ├── keyboardInput.js # keydown listener → judgeLane()
+│   ├── gamepadInput.js  # Gamepad API polling → judgeLane()
+│   └── cvInput/
+│       ├── poseModel.js    # loads + runs MoveNet (TensorFlow.js)
+│       ├── zoneDetector.js # ankle coords → zone/step detection → judgeLane()
+│       └── CVOverlay.jsx   # webcam feed + zone/skeleton overlay UI
+├── App.jsx              # mode switcher (keyboard / gamepad / CV)
+└── index.jsx
+firmware/
+└── nutrient_ddr_mat.ino # Arduino sketch for an FSR mat (USB HID keyboard emulation)
+```
 
 ## Running it
 
-Cameras require a secure context, so serve the file rather than double-clicking it:
-
 ```sh
-npx serve .        # then open http://localhost:3000
-# or
-python -m http.server 8000
+npm install
+npm run dev
 ```
 
-To use a **phone** as the camera (recommended — mount it above the mat), the page must be
-reached over HTTPS. Easy options:
+Then open the printed localhost URL. The CV mode needs a secure context (localhost is
+fine) and camera permission; the pose model loads from TensorFlow.js on first use.
 
-- Push the repo to GitHub and enable GitHub Pages, or
-- Tunnel your local server: `npx ngrok http 3000` (or `cloudflared tunnel`).
+## Legacy: standalone color-tile detector
 
-## Usage
-
-1. Open the page, tap **Start camera** (grant permission; the rear camera is preferred).
-2. Position the camera so the whole mat is visible, with nobody on it.
-3. Tap **Calibrate empty mat** — the status line lists which tiles were found, and the
-   video is tinted to show the detected tile regions.
-4. Step on a tile. The banner turns that color, the mini-mat lights up, and the color is
-   spoken aloud (toggle **Voice** off to mute).
-
-If detection is jumpy, raise the **Sensitivity** slider value (foot must cover more of the
-tile); if steps are missed, lower it. Recalibrate whenever the camera moves or the lighting
-changes.
-
-## Known limitations
-
-- A white sock on the white tile looks like the tile itself, so the center tile may need
-  the foot's shadow to trigger. Shoes or bare feet work best.
-- Very colorful shoes matching a tile color (e.g. bright green sneakers on the green tile)
-  reduce that tile's occlusion signal.
+The original single-file, no-build-tool app that detects which colored tile
+([mat-layout.svg](public/mat-layout.svg)) a foot is standing on via pixel-color
+occlusion (no ML) still works standalone — see
+[legacy/foot-tile-color-detector.html](legacy/foot-tile-color-detector.html). Serve it
+directly (e.g. `npx serve legacy`) if you just need that tool.
