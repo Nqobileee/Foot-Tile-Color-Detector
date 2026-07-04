@@ -6,32 +6,54 @@ import {
   ZONE_OFFSET_RANGE,
   ZONE_SCALE_MIN,
   ZONE_SCALE_MAX,
-  adjustedZoneBox,
+  ZONE_GLOBAL_SCALE_DEFAULT,
+  ZONE_GLOBAL_SCALE_MIN,
+  ZONE_GLOBAL_SCALE_MAX,
+  effectiveZoneBox,
 } from '../../game/constants.js';
 import { loadPoseModel, estimatePose } from './poseModel.js';
 import { createZoneDetector } from './zoneDetector.js';
+import { detectZonesFromFrame } from './colorCalibration.js';
 
 // Layer 1 (webcam) + Layers 2-3 (pose estimation, zone detection), wrapped
 // as a self-contained input adapter component. Renders the webcam feed with
 // a debug overlay (zone boxes + skeleton) and drives judgeLane(laneIdx) —
 // the game engine behind it has no idea a camera is involved.
-export default function CVOverlay({ judgeLane, style }) {
+export default function CVOverlay({ judgeLane, style, calibrating = false, onDoneCalibrating }) {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const [status, setStatus] = useState('Loading pose model…');
-  const [calibrationOpen, setCalibrationOpen] = useState(false);
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [globalScale, setGlobalScale] = useState(ZONE_GLOBAL_SCALE_DEFAULT);
   const [zoneAdjust, setZoneAdjust] = useState(() => LANES.map(() => ({ ...ZONE_ADJUST_DEFAULT })));
-  const zoneAdjustRef = useRef(zoneAdjust);
+  const [autoBoxes, setAutoBoxes] = useState(null); // per-lane detected box, or null per-lane if not found
+  const calibrationRef = useRef({ globalScale, perLane: zoneAdjust, autoBoxes });
   useEffect(() => {
-    zoneAdjustRef.current = zoneAdjust;
-  }, [zoneAdjust]);
+    calibrationRef.current = { globalScale, perLane: zoneAdjust, autoBoxes };
+  }, [globalScale, zoneAdjust, autoBoxes]);
+
+  const panelVisible = calibrating || panelOpen;
 
   function updateZoneAdjust(laneIdx, patch) {
     setZoneAdjust((prev) => prev.map((a, i) => (i === laneIdx ? { ...a, ...patch } : a)));
   }
 
-  function resetZoneAdjust() {
+  function resetAll() {
+    setGlobalScale(ZONE_GLOBAL_SCALE_DEFAULT);
     setZoneAdjust(LANES.map(() => ({ ...ZONE_ADJUST_DEFAULT })));
+    setAutoBoxes(null);
+  }
+
+  function calibrateEmptyMat() {
+    const detected = detectZonesFromFrame(videoRef.current);
+    setAutoBoxes(detected);
+    const found = LANES.filter((l) => detected[l.idx]).map((l) => l.name);
+    const missing = LANES.filter((l) => !detected[l.idx]).map((l) => l.name);
+    setStatus(
+      found.length === 0
+        ? 'No tile colors found — make sure the mat is empty and well lit, then try again.'
+        : `Detected: ${found.join(', ')}.` + (missing.length ? ` Not found: ${missing.join(', ')} (using default box).` : '')
+    );
   }
 
   useEffect(() => {
@@ -66,8 +88,8 @@ export default function CVOverlay({ judgeLane, style }) {
         if (cancelled) return;
         const now = performance.now();
         const keypoints = await estimatePose(detector, video);
-        zoneDetector.update(keypoints, video.videoWidth, video.videoHeight, now, zoneAdjustRef.current);
-        drawOverlay(ctx, canvas.width, canvas.height, keypoints, zoneAdjustRef.current);
+        zoneDetector.update(keypoints, video.videoWidth, video.videoHeight, now, calibrationRef.current);
+        drawOverlay(ctx, canvas.width, canvas.height, keypoints, calibrationRef.current);
         raf = requestAnimationFrame(loop);
       }
       raf = requestAnimationFrame(loop);
@@ -100,63 +122,91 @@ export default function CVOverlay({ judgeLane, style }) {
       <div style={{ flex: '0 0 auto', padding: '6px 4px' }}>
         <p style={{ fontSize: 13, opacity: 0.8, margin: '0 0 6px' }}>{status}</p>
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <button type="button" onClick={() => setCalibrationOpen((v) => !v)} style={{ fontSize: 12 }}>
-            {calibrationOpen ? 'Hide' : 'Calibrate'} zones
-          </button>
-          {calibrationOpen && (
-            <button type="button" onClick={resetZoneAdjust} style={{ fontSize: 12 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+          {calibrating ? (
+            <strong style={{ fontSize: 13 }}>Calibrate the zones, then hit Done</strong>
+          ) : (
+            <button type="button" onClick={() => setPanelOpen((v) => !v)} style={{ fontSize: 12 }}>
+              {panelOpen ? 'Hide' : 'Recalibrate'} zones
+            </button>
+          )}
+          {panelVisible && (
+            <button type="button" onClick={resetAll} style={{ fontSize: 12 }}>
               Reset
+            </button>
+          )}
+          {calibrating && (
+            <button type="button" onClick={onDoneCalibrating} style={{ fontSize: 13, fontWeight: 700 }}>
+              Done
             </button>
           )}
         </div>
 
-        {calibrationOpen && (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, maxHeight: '30vh', overflowY: 'auto', marginTop: 8 }}>
-            {LANES.map((lane) => (
-              <div key={lane.idx} style={{ border: `1px solid ${lane.color}`, borderRadius: 8, padding: 6 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, marginBottom: 4 }}>
-                  <span style={{ width: 10, height: 10, borderRadius: '50%', background: lane.color, display: 'inline-block' }} />
-                  {lane.name}
+        {panelVisible && (
+          <div style={{ marginTop: 8 }}>
+            <button type="button" onClick={calibrateEmptyMat} style={{ fontSize: 13, fontWeight: 700, marginBottom: 8, width: '100%' }}>
+              Auto-detect zones (empty mat)
+            </button>
+
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, marginBottom: 8 }}>
+              All zones size: {Math.round(globalScale * 100)}%
+              <input
+                type="range"
+                min={ZONE_GLOBAL_SCALE_MIN}
+                max={ZONE_GLOBAL_SCALE_MAX}
+                step={0.05}
+                value={globalScale}
+                onChange={(e) => setGlobalScale(Number(e.target.value))}
+                style={{ flex: 1 }}
+              />
+            </label>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, maxHeight: '30vh', overflowY: 'auto' }}>
+              {LANES.map((lane) => (
+                <div key={lane.idx} style={{ border: `1px solid ${lane.color}`, borderRadius: 8, padding: 6 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, marginBottom: 4 }}>
+                    <span style={{ width: 10, height: 10, borderRadius: '50%', background: lane.color, display: 'inline-block' }} />
+                    {lane.name}
+                  </div>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11 }}>
+                    X
+                    <input
+                      type="range"
+                      min={-ZONE_OFFSET_RANGE}
+                      max={ZONE_OFFSET_RANGE}
+                      step={0.01}
+                      value={zoneAdjust[lane.idx].offsetX}
+                      onChange={(e) => updateZoneAdjust(lane.idx, { offsetX: Number(e.target.value) })}
+                      style={{ flex: 1 }}
+                    />
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11 }}>
+                    Y
+                    <input
+                      type="range"
+                      min={-ZONE_OFFSET_RANGE}
+                      max={ZONE_OFFSET_RANGE}
+                      step={0.01}
+                      value={zoneAdjust[lane.idx].offsetY}
+                      onChange={(e) => updateZoneAdjust(lane.idx, { offsetY: Number(e.target.value) })}
+                      style={{ flex: 1 }}
+                    />
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11 }}>
+                    Size
+                    <input
+                      type="range"
+                      min={ZONE_SCALE_MIN}
+                      max={ZONE_SCALE_MAX}
+                      step={0.05}
+                      value={zoneAdjust[lane.idx].scale}
+                      onChange={(e) => updateZoneAdjust(lane.idx, { scale: Number(e.target.value) })}
+                      style={{ flex: 1 }}
+                    />
+                  </label>
                 </div>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11 }}>
-                  X
-                  <input
-                    type="range"
-                    min={-ZONE_OFFSET_RANGE}
-                    max={ZONE_OFFSET_RANGE}
-                    step={0.01}
-                    value={zoneAdjust[lane.idx].offsetX}
-                    onChange={(e) => updateZoneAdjust(lane.idx, { offsetX: Number(e.target.value) })}
-                    style={{ flex: 1 }}
-                  />
-                </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11 }}>
-                  Y
-                  <input
-                    type="range"
-                    min={-ZONE_OFFSET_RANGE}
-                    max={ZONE_OFFSET_RANGE}
-                    step={0.01}
-                    value={zoneAdjust[lane.idx].offsetY}
-                    onChange={(e) => updateZoneAdjust(lane.idx, { offsetY: Number(e.target.value) })}
-                    style={{ flex: 1 }}
-                  />
-                </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11 }}>
-                  Size
-                  <input
-                    type="range"
-                    min={ZONE_SCALE_MIN}
-                    max={ZONE_SCALE_MAX}
-                    step={0.05}
-                    value={zoneAdjust[lane.idx].scale}
-                    onChange={(e) => updateZoneAdjust(lane.idx, { scale: Number(e.target.value) })}
-                    style={{ flex: 1 }}
-                  />
-                </label>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         )}
       </div>
@@ -164,14 +214,15 @@ export default function CVOverlay({ judgeLane, style }) {
   );
 }
 
-function drawOverlay(ctx, w, h, keypoints, zoneAdjust) {
+function drawOverlay(ctx, w, h, keypoints, calibration) {
   ctx.clearRect(0, 0, w, h);
 
   ctx.lineWidth = 3;
   ctx.font = 'bold 14px sans-serif';
   for (const { laneIdx, box } of CV_ZONES) {
     const lane = LANES[laneIdx];
-    const b = adjustedZoneBox(box, zoneAdjust[laneIdx]);
+    const baseBox = calibration.autoBoxes?.[laneIdx] ?? box;
+    const b = effectiveZoneBox(baseBox, calibration.globalScale, calibration.perLane[laneIdx]);
     const x = b.x0 * w;
     const y = b.y0 * h;
     const bw = (b.x1 - b.x0) * w;

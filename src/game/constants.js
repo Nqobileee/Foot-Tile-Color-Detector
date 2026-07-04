@@ -29,6 +29,21 @@ export const ZONE_OFFSET_RANGE = 0.3; // max nudge in either direction, normaliz
 export const ZONE_SCALE_MIN = 0.4;
 export const ZONE_SCALE_MAX = 2.2;
 
+// Global "resize all zones at once" control, applied around the frame center
+// before each zone's own independent nudge/resize (see adjustedZoneBox).
+export const ZONE_GLOBAL_SCALE_DEFAULT = 1;
+export const ZONE_GLOBAL_SCALE_MIN = 0.3;
+export const ZONE_GLOBAL_SCALE_MAX = 2;
+
+export function scaledZoneBox(box, scale) {
+  return {
+    x0: 0.5 + (box.x0 - 0.5) * scale,
+    x1: 0.5 + (box.x1 - 0.5) * scale,
+    y0: 0.5 + (box.y0 - 0.5) * scale,
+    y1: 0.5 + (box.y1 - 0.5) * scale,
+  };
+}
+
 export function adjustedZoneBox(box, adjust) {
   const { offsetX, offsetY, scale } = adjust ?? ZONE_ADJUST_DEFAULT;
   const cx = (box.x0 + box.x1) / 2;
@@ -39,6 +54,11 @@ export function adjustedZoneBox(box, adjust) {
     y0: cy + (box.y0 - cy) * scale + offsetY,
     y1: cy + (box.y1 - cy) * scale + offsetY,
   };
+}
+
+// Composes the global grid resize with each zone's own independent nudge.
+export function effectiveZoneBox(box, globalScale, laneAdjust) {
+  return adjustedZoneBox(scaledZoneBox(box, globalScale), laneAdjust);
 }
 
 // Render loop / note timing
