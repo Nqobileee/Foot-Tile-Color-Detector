@@ -25,8 +25,8 @@ const GameEngine = forwardRef(function GameEngine(_props, ref) {
   const canvasRef = useRef(null);
   const notesRef = useRef([]);
   const lastSpawnRef = useRef(0);
-  const stepFlashRef = useRef({}); // laneIdx -> { correct, timestamp }
-  const [score, setScore] = useState(0);
+  const stepFlashRef = useRef(null); // { laneIdx, color, timestamp } — column glow on any step
+  const [circles, setCircles] = useState(0);
   const [combo, setCombo] = useState(0);
   const [lastJudgement, setLastJudgement] = useState(null);
 
@@ -39,11 +39,10 @@ const GameEngine = forwardRef(function GameEngine(_props, ref) {
       },
       onJudgement: ({ laneIdx, judgement, timestamp }) => {
         setLastJudgement(judgement);
-        const correct = judgement === 'hit';
-        stepFlashRef.current[laneIdx] = { correct, timestamp };
-        if (correct) {
+        stepFlashRef.current = { laneIdx, color: LANES[laneIdx].color, timestamp };
+        if (judgement === 'hit') {
           setCombo((c) => c + 1);
-          setScore((s) => s + 100);
+          setCircles((c) => c + 1);
         } else {
           setCombo(0);
         }
@@ -127,35 +126,18 @@ const GameEngine = forwardRef(function GameEngine(_props, ref) {
         ctx.fillText(lane.arrow, x, y + 1);
       }
 
-      const bandY = h * 0.82;
-      LANES.forEach((lane) => {
-        const flash = stepFlashRef.current[lane.idx];
-        if (!flash) return;
+      const flash = stepFlashRef.current;
+      if (flash) {
         const age = now - flash.timestamp;
-        if (age < 0 || age > STEP_FLASH_DURATION_MS) return;
-
-        const alpha = 1 - age / STEP_FLASH_DURATION_MS;
-        const x = lane.idx * laneW;
-
-        ctx.globalAlpha = alpha;
-        ctx.fillStyle = lane.color;
-        ctx.fillRect(x, bandY, laneW, h - bandY);
-        ctx.globalAlpha = 1;
-
-        const symbol = flash.correct ? '✓' : '✕';
-        const cx = x + laneW / 2;
-        const cy = bandY + (h - bandY) / 2;
-        ctx.font = 'bold 42px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.globalAlpha = alpha;
-        ctx.lineWidth = 5;
-        ctx.strokeStyle = 'rgba(0,0,0,0.65)';
-        ctx.strokeText(symbol, cx, cy);
-        ctx.fillStyle = flash.correct ? '#1FAE4A' : '#E31B4C';
-        ctx.fillText(symbol, cx, cy);
-        ctx.globalAlpha = 1;
-      });
+        if (age >= 0 && age <= STEP_FLASH_DURATION_MS) {
+          const alpha = 1 - age / STEP_FLASH_DURATION_MS;
+          const x = flash.laneIdx * laneW;
+          ctx.globalAlpha = alpha * 0.6;
+          ctx.fillStyle = flash.color;
+          ctx.fillRect(x, 0, laneW, h);
+          ctx.globalAlpha = 1;
+        }
+      }
     }
 
     function loop(ts) {
@@ -180,7 +162,7 @@ const GameEngine = forwardRef(function GameEngine(_props, ref) {
     <div style={{ position: 'relative', width: '100%', maxWidth: 640 }}>
       <canvas ref={canvasRef} style={{ width: '100%', height: 420, display: 'block' }} />
       <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 4px', fontSize: 14 }}>
-        <span>Score: {score}</span>
+        <span>Circles: {circles}</span>
         <span>Combo: {combo}</span>
         <span>{lastJudgement ?? ''}</span>
       </div>
