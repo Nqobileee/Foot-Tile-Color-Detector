@@ -23,6 +23,7 @@ export const CV_ZONES = [
 export const SCROLL_SPEED_PX_PER_SEC = 180;
 export const HIT_LINE_Y = 0.85; // fraction of canvas height
 export const NOTE_RADIUS = 22;
+export const STEP_FLASH_DURATION_MS = 450; // how long the bottom lane flash + tick/cross lingers
 
 // Judging windows, in ms from the note's ideal hit time
 export const JUDGE_WINDOWS = {

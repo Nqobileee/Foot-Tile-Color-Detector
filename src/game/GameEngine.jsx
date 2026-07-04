@@ -6,6 +6,7 @@ import {
   HIT_LINE_Y,
   NOTE_RADIUS,
   JUDGE_WINDOWS,
+  STEP_FLASH_DURATION_MS,
 } from './constants.js';
 import { createJudgeLane } from './judgeLane.js';
 
@@ -19,6 +20,7 @@ const GameEngine = forwardRef(function GameEngine(_props, ref) {
   const canvasRef = useRef(null);
   const notesRef = useRef([]);
   const lastSpawnRef = useRef(0);
+  const stepFlashRef = useRef({}); // laneIdx -> { correct, timestamp }
   const [score, setScore] = useState(0);
   const [combo, setCombo] = useState(0);
   const [lastJudgement, setLastJudgement] = useState(null);
@@ -30,9 +32,11 @@ const GameEngine = forwardRef(function GameEngine(_props, ref) {
       removeNote: (id) => {
         notesRef.current = notesRef.current.filter((n) => n.id !== id);
       },
-      onJudgement: ({ judgement }) => {
+      onJudgement: ({ laneIdx, judgement, timestamp }) => {
         setLastJudgement(judgement);
-        if (judgement === 'perfect' || judgement === 'good') {
+        const correct = judgement === 'perfect' || judgement === 'good';
+        stepFlashRef.current[laneIdx] = { correct, timestamp };
+        if (correct) {
           setCombo((c) => c + 1);
           setScore((s) => s + (judgement === 'perfect' ? 100 : 60));
         } else {
@@ -118,6 +122,35 @@ const GameEngine = forwardRef(function GameEngine(_props, ref) {
         ctx.fillStyle = LANES[note.laneIdx].color;
         ctx.fill();
       }
+
+      LANES.forEach((lane) => {
+        const flash = stepFlashRef.current[lane.idx];
+        if (!flash) return;
+        const age = now - flash.timestamp;
+        if (age < 0 || age > STEP_FLASH_DURATION_MS) return;
+
+        const alpha = 1 - age / STEP_FLASH_DURATION_MS;
+        const x = lane.idx * laneW;
+
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = lane.color;
+        ctx.fillRect(x, hitLineY, laneW, h - hitLineY);
+        ctx.globalAlpha = 1;
+
+        const symbol = flash.correct ? '✓' : '✕';
+        const cx = x + laneW / 2;
+        const cy = hitLineY + (h - hitLineY) / 2;
+        ctx.font = 'bold 42px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.globalAlpha = alpha;
+        ctx.lineWidth = 5;
+        ctx.strokeStyle = 'rgba(0,0,0,0.65)';
+        ctx.strokeText(symbol, cx, cy);
+        ctx.fillStyle = flash.correct ? '#1FAE4A' : '#E31B4C';
+        ctx.fillText(symbol, cx, cy);
+        ctx.globalAlpha = 1;
+      });
     }
 
     function loop(ts) {
