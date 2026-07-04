@@ -5,7 +5,7 @@ const ANKLE_NAMES = ['left_ankle', 'right_ankle'];
 
 function zoneForPoint(nx, ny, calibration) {
   const zone = CV_ZONES.find(({ laneIdx, box }) => {
-    const baseBox = calibration.autoBoxes?.[laneIdx] ?? box;
+    const baseBox = calibration.autoBoxes?.[laneIdx]?.box ?? box;
     const b = effectiveZoneBox(baseBox, calibration.globalScale, calibration.perLane[laneIdx]);
     return nx >= b.x0 && nx <= b.x1 && ny >= b.y0 && ny <= b.y1;
   });
@@ -33,7 +33,7 @@ export function createZoneDetector(judgeLane) {
 
   // keypoints: MoveNet's 17 keypoints in video pixel coordinates.
   // videoWidth/videoHeight: dimensions to normalize against.
-  // calibration: { globalScale, perLane: [...], autoBoxes: [box|null, ...] } (see constants.js).
+  // calibration: { globalScale, perLane: [...], autoBoxes: [{box,colorHex}|null, ...] }.
   function update(keypoints, videoWidth, videoHeight, now, calibration) {
     if (!keypoints) return;
 

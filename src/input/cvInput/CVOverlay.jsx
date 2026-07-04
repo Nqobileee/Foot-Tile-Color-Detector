@@ -221,15 +221,20 @@ function drawOverlay(ctx, w, h, keypoints, calibration) {
   ctx.font = 'bold 14px sans-serif';
   for (const { laneIdx, box } of CV_ZONES) {
     const lane = LANES[laneIdx];
-    const baseBox = calibration.autoBoxes?.[laneIdx] ?? box;
+    const detected = calibration.autoBoxes?.[laneIdx];
+    const baseBox = detected?.box ?? box;
+    // Outline in whatever color was actually detected there, not the lane's
+    // arbitrary game-arrow color — the tile you see and the box around it
+    // should visually match during calibration.
+    const outlineColor = detected?.colorHex ?? lane.color;
     const b = effectiveZoneBox(baseBox, calibration.globalScale, calibration.perLane[laneIdx]);
     const x = b.x0 * w;
     const y = b.y0 * h;
     const bw = (b.x1 - b.x0) * w;
     const bh = (b.y1 - b.y0) * h;
-    ctx.strokeStyle = lane.color;
+    ctx.strokeStyle = outlineColor;
     ctx.strokeRect(x, y, bw, bh);
-    ctx.fillStyle = lane.color;
+    ctx.fillStyle = outlineColor;
     ctx.fillText(lane.name, x + 6, y + 18);
   }
 
