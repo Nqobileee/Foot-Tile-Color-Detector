@@ -20,7 +20,7 @@ export const CV_ZONES = [
 ];
 
 // Render loop / note timing
-export const SCROLL_SPEED_PX_PER_SEC = 420;
+export const SCROLL_SPEED_PX_PER_SEC = 180;
 export const HIT_LINE_Y = 0.85; // fraction of canvas height
 export const NOTE_RADIUS = 22;
 
