@@ -40,7 +40,7 @@ function drawArrow(ctx, cx, cy, r, angle, color) {
 // Layer 4: React + Canvas rendering. Owns notes, scoring, and combo state.
 // Exposes judgeLane(laneIdx) via ref so any input adapter — keyboard, mat,
 // gamepad, or CV zone detection — can drive it identically.
-const GameEngine = forwardRef(function GameEngine(_props, ref) {
+const GameEngine = forwardRef(function GameEngine({ style }, ref) {
   const canvasRef = useRef(null);
   const notesRef = useRef([]);
   const lastSpawnRef = useRef(0);
@@ -83,7 +83,11 @@ const GameEngine = forwardRef(function GameEngine(_props, ref) {
       canvas.height = canvas.clientHeight;
     }
     resize();
-    window.addEventListener('resize', resize);
+    // A ResizeObserver (not just window 'resize') catches layout-driven size
+    // changes too, e.g. this canvas's flex box shrinking when CV mode adds a
+    // sibling panel, which doesn't fire a window resize event.
+    const observer = new ResizeObserver(resize);
+    observer.observe(canvas);
 
     function travelTimeMs() {
       return (canvas.height / SCROLL_SPEED_PX_PER_SEC) * 1000;
@@ -172,14 +176,25 @@ const GameEngine = forwardRef(function GameEngine(_props, ref) {
 
     return () => {
       cancelAnimationFrame(raf);
-      window.removeEventListener('resize', resize);
+      observer.disconnect();
     };
   }, []);
 
   return (
-    <div style={{ position: 'relative', width: '100%', maxWidth: 640 }}>
-      <canvas ref={canvasRef} style={{ width: '100%', height: 420, display: 'block' }} />
-      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 4px', fontSize: 14 }}>
+    <div
+      style={{
+        position: 'relative',
+        width: '100%',
+        maxWidth: 640,
+        margin: '0 auto',
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        ...style,
+      }}
+    >
+      <canvas ref={canvasRef} style={{ width: '100%', flex: '1 1 0', minHeight: 0, display: 'block' }} />
+      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 4px', fontSize: 14, flex: '0 0 auto' }}>
         <span>Combo: {combo}</span>
         <span>{lastJudgement ?? ''}</span>
       </div>

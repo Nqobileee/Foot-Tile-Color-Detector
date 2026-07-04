@@ -25,21 +25,45 @@ export default function App() {
   }, [mode]);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, padding: 12 }}>
-      <h1>Nutri-Step</h1>
-      <div style={{ display: 'flex', gap: 8 }}>
-        {MODES.map((m) => (
-          <button key={m.id} onClick={() => setMode(m.id)} disabled={mode === m.id}>
-            {m.label}
-          </button>
-        ))}
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100dvh',
+        width: '100%',
+        overflow: 'hidden',
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: 6,
+          padding: '8px 12px',
+          flex: '0 0 auto',
+        }}
+      >
+        <h1 style={{ margin: 0, fontSize: 18 }}>Nutri-Step</h1>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
+          {MODES.map((m) => (
+            <button key={m.id} onClick={() => setMode(m.id)} disabled={mode === m.id}>
+              {m.label}
+            </button>
+          ))}
+        </div>
       </div>
 
-      <GameEngine ref={engineRef} />
+      <div style={{ flex: '1 1 auto', minHeight: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <GameEngine ref={engineRef} style={{ flex: mode === 'cv' ? '1 1 0' : '1 1 auto', minHeight: 0 }} />
 
-      {mode === 'cv' && (
-        <CVOverlay judgeLane={(laneIdx) => engineRef.current?.judgeLane(laneIdx)} />
-      )}
+        {mode === 'cv' && (
+          <CVOverlay
+            judgeLane={(laneIdx) => engineRef.current?.judgeLane(laneIdx)}
+            style={{ flex: '1 1 0', minHeight: 0 }}
+          />
+        )}
+      </div>
     </div>
   );
 }

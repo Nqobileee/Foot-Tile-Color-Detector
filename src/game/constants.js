@@ -1,10 +1,10 @@
 // Layer 4 shared config. Lane order matches the physical mat and the
 // Input Adapter Comparison table in architecture.md (ArrowLeft/Up/Right/Down).
 export const LANES = [
-  { idx: 0, name: 'left', key: 'ArrowLeft', gamepadButton: 14, color: '#1FAE4A', arrowAngle: Math.PI }, // green ←
-  { idx: 1, name: 'up', key: 'ArrowUp', gamepadButton: 12, color: '#F4D913', arrowAngle: -Math.PI / 2 }, // yellow ↑
-  { idx: 2, name: 'down', key: 'ArrowDown', gamepadButton: 13, color: '#1CA7EC', arrowAngle: Math.PI / 2 }, // blue ↓
-  { idx: 3, name: 'right', key: 'ArrowRight', gamepadButton: 15, color: '#E31B4C', arrowAngle: 0 }, // red →
+  { idx: 0, name: 'left', key: 'ArrowLeft', gamepadButton: 14, color: '#E31B4C', arrowAngle: Math.PI }, // red ←
+  { idx: 1, name: 'up', key: 'ArrowUp', gamepadButton: 12, color: '#1CA7EC', arrowAngle: -Math.PI / 2 }, // blue ↑
+  { idx: 2, name: 'down', key: 'ArrowDown', gamepadButton: 13, color: '#F4D913', arrowAngle: Math.PI / 2 }, // yellow ↓
+  { idx: 3, name: 'right', key: 'ArrowRight', gamepadButton: 15, color: '#1FAE4A', arrowAngle: 0 }, // green →
 ];
 
 export const LANE_COUNT = LANES.length;
@@ -19,19 +19,25 @@ export const CV_ZONES = [
   { laneIdx: 3, box: { x0: 0.67, y0: 0.35, x1: 1.0, y1: 0.75 } }, // right
 ];
 
-// User-adjustable zoom for the CV zone grid, since how wide the physical mat
-// appears depends on camera placement. Scales each box toward/away from the
-// frame center (0.5, 0.5); scale < 1 shrinks the grid, > 1 grows it.
-export const ZONE_SCALE_DEFAULT = 1;
-export const ZONE_SCALE_MIN = 0.3;
-export const ZONE_SCALE_MAX = 2;
+// Per-lane, user-adjustable calibration for the CV zone grid. A camera
+// looking at the mat from an angle sees each tile as a skewed quadrilateral,
+// not a clean axis-aligned rectangle, and exactly how skewed depends on
+// camera placement — so each zone can be nudged (offsetX/offsetY) and resized
+// (scale, around its own center) independently to fit what the camera sees.
+export const ZONE_ADJUST_DEFAULT = { offsetX: 0, offsetY: 0, scale: 1 };
+export const ZONE_OFFSET_RANGE = 0.3; // max nudge in either direction, normalized units
+export const ZONE_SCALE_MIN = 0.4;
+export const ZONE_SCALE_MAX = 2.2;
 
-export function scaledZoneBox(box, scale) {
+export function adjustedZoneBox(box, adjust) {
+  const { offsetX, offsetY, scale } = adjust ?? ZONE_ADJUST_DEFAULT;
+  const cx = (box.x0 + box.x1) / 2;
+  const cy = (box.y0 + box.y1) / 2;
   return {
-    x0: 0.5 + (box.x0 - 0.5) * scale,
-    y0: 0.5 + (box.y0 - 0.5) * scale,
-    x1: 0.5 + (box.x1 - 0.5) * scale,
-    y1: 0.5 + (box.y1 - 0.5) * scale,
+    x0: cx + (box.x0 - cx) * scale + offsetX,
+    x1: cx + (box.x1 - cx) * scale + offsetX,
+    y0: cy + (box.y0 - cy) * scale + offsetY,
+    y1: cy + (box.y1 - cy) * scale + offsetY,
   };
 }
 
