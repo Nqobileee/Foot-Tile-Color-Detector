@@ -8,14 +8,33 @@ import {
 } from './constants.js';
 import { createJudgeLane } from './judgeLane.js';
 
-const SPAWN_INTERVAL_MS = 1200;
+const SPAWN_INTERVAL_MS = 1700;
 let noteIdSeq = 0;
 
-function contrastTextColor(hex) {
-  const n = parseInt(hex.slice(1), 16);
-  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
-  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-  return luminance > 0.6 ? '#1a1a1a' : '#ffffff';
+// Bold, chunky 2D arrow (chevron head + thick shaft) — drawn as a filled
+// path so it reads clearly at small sizes, unlike thin font glyphs.
+function drawArrow(ctx, cx, cy, r, angle, color) {
+  const xTail = -r * 0.8;
+  const xHeadStart = r * 0.05;
+  const xTip = r * 0.9;
+  const shaftHalfW = r * 0.26;
+  const headHalfW = r * 0.55;
+
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(angle);
+  ctx.beginPath();
+  ctx.moveTo(xTail, -shaftHalfW);
+  ctx.lineTo(xHeadStart, -shaftHalfW);
+  ctx.lineTo(xHeadStart, -headHalfW);
+  ctx.lineTo(xTip, 0);
+  ctx.lineTo(xHeadStart, headHalfW);
+  ctx.lineTo(xHeadStart, shaftHalfW);
+  ctx.lineTo(xTail, shaftHalfW);
+  ctx.closePath();
+  ctx.fillStyle = color;
+  ctx.fill();
+  ctx.restore();
 }
 
 // Layer 4: React + Canvas rendering. Owns notes, scoring, and combo state.
@@ -26,7 +45,7 @@ const GameEngine = forwardRef(function GameEngine(_props, ref) {
   const notesRef = useRef([]);
   const lastSpawnRef = useRef(0);
   const stepFlashRef = useRef(null); // { laneIdx, color, timestamp } — column glow on any step
-  const [circles, setCircles] = useState(0);
+  const circlesRef = useRef(0); // hit count, drawn big/bold on the canvas itself
   const [combo, setCombo] = useState(0);
   const [lastJudgement, setLastJudgement] = useState(null);
 
@@ -42,7 +61,7 @@ const GameEngine = forwardRef(function GameEngine(_props, ref) {
         stepFlashRef.current = { laneIdx, color: LANES[laneIdx].color, timestamp };
         if (judgement === 'hit') {
           setCombo((c) => c + 1);
-          setCircles((c) => c + 1);
+          circlesRef.current += 1;
         } else {
           setCombo(0);
         }
@@ -113,17 +132,7 @@ const GameEngine = forwardRef(function GameEngine(_props, ref) {
         const y = progress * h;
         const x = note.laneIdx * laneW + laneW / 2;
         const lane = LANES[note.laneIdx];
-
-        ctx.beginPath();
-        ctx.arc(x, y, NOTE_RADIUS, 0, Math.PI * 2);
-        ctx.fillStyle = lane.color;
-        ctx.fill();
-
-        ctx.font = `bold ${Math.round(NOTE_RADIUS * 1.1)}px sans-serif`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillStyle = contrastTextColor(lane.color);
-        ctx.fillText(lane.arrow, x, y + 1);
+        drawArrow(ctx, x, y, NOTE_RADIUS * 1.3, lane.arrowAngle, lane.color);
       }
 
       const flash = stepFlashRef.current;
@@ -138,6 +147,15 @@ const GameEngine = forwardRef(function GameEngine(_props, ref) {
           ctx.globalAlpha = 1;
         }
       }
+
+      ctx.font = 'bold 56px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = 'rgba(0,0,0,0.7)';
+      ctx.strokeText(String(circlesRef.current), w / 2, 10);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(String(circlesRef.current), w / 2, 10);
     }
 
     function loop(ts) {
@@ -162,7 +180,6 @@ const GameEngine = forwardRef(function GameEngine(_props, ref) {
     <div style={{ position: 'relative', width: '100%', maxWidth: 640 }}>
       <canvas ref={canvasRef} style={{ width: '100%', height: 420, display: 'block' }} />
       <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 4px', fontSize: 14 }}>
-        <span>Circles: {circles}</span>
         <span>Combo: {combo}</span>
         <span>{lastJudgement ?? ''}</span>
       </div>

@@ -1,10 +1,10 @@
 // Layer 4 shared config. Lane order matches the physical mat and the
 // Input Adapter Comparison table in architecture.md (ArrowLeft/Up/Right/Down).
 export const LANES = [
-  { idx: 0, name: 'left', key: 'ArrowLeft', gamepadButton: 14, color: '#1FAE4A', arrow: '←' }, // green ←
-  { idx: 1, name: 'up', key: 'ArrowUp', gamepadButton: 12, color: '#F4D913', arrow: '↑' }, // yellow ↑
-  { idx: 2, name: 'down', key: 'ArrowDown', gamepadButton: 13, color: '#1CA7EC', arrow: '↓' }, // blue ↓
-  { idx: 3, name: 'right', key: 'ArrowRight', gamepadButton: 15, color: '#E31B4C', arrow: '→' }, // red →
+  { idx: 0, name: 'left', key: 'ArrowLeft', gamepadButton: 14, color: '#1FAE4A', arrowAngle: Math.PI }, // green ←
+  { idx: 1, name: 'up', key: 'ArrowUp', gamepadButton: 12, color: '#F4D913', arrowAngle: -Math.PI / 2 }, // yellow ↑
+  { idx: 2, name: 'down', key: 'ArrowDown', gamepadButton: 13, color: '#1CA7EC', arrowAngle: Math.PI / 2 }, // blue ↓
+  { idx: 3, name: 'right', key: 'ArrowRight', gamepadButton: 15, color: '#E31B4C', arrowAngle: 0 }, // red →
 ];
 
 export const LANE_COUNT = LANES.length;
@@ -36,9 +36,9 @@ export function scaledZoneBox(box, scale) {
 }
 
 // Render loop / note timing
-export const SCROLL_SPEED_PX_PER_SEC = 180;
+export const SCROLL_SPEED_PX_PER_SEC = 140;
 export const NOTE_RADIUS = 22;
-export const STEP_FLASH_DURATION_MS = 450; // how long the bottom lane flash + tick/cross lingers
+export const STEP_FLASH_DURATION_MS = 900; // how long the column glow lingers
 
 // Zone/step detection tuning (Layer 3)
 export const STEP_DETECTION = {
