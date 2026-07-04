@@ -7,6 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import jpeg from 'jpeg-js';
+import { PNG } from 'pngjs';
 import * as tf from '@tensorflow/tfjs';
 import * as mobilenet from '@tensorflow-models/mobilenet';
 import * as knnClassifier from '@tensorflow-models/knn-classifier';
@@ -17,10 +18,18 @@ const IMAGES_DIR = path.join(ROOT, 'images');
 const LABELS_PATH = path.join(ROOT, 'scripts', 'labels.json');
 const OUT_PATH = path.join(ROOT, 'public', 'tile-classifier-dataset.json');
 
-function loadImageTensor(filePath) {
+// Trust magic bytes, not the file extension — some of these photos are
+// JPEGs saved with a .PNG extension (iOS export quirk).
+function decodeImage(filePath) {
   const buf = fs.readFileSync(filePath);
-  const { width, height, data } = jpeg.decode(buf, { useTArray: true });
-  // jpeg-js gives RGBA; MobileNet wants RGB.
+  const isJpeg = buf[0] === 0xff && buf[1] === 0xd8;
+  if (isJpeg) return jpeg.decode(buf, { useTArray: true }); // { width, height, data: RGBA }
+  return PNG.sync.read(buf); // { width, height, data: RGBA Buffer }
+}
+
+function loadImageTensor(filePath) {
+  const { width, height, data } = decodeImage(filePath);
+  // Both decoders give RGBA; MobileNet wants RGB.
   const rgb = new Int32Array(width * height * 3);
   for (let i = 0, j = 0; i < data.length; i += 4, j += 3) {
     rgb[j] = data[i];

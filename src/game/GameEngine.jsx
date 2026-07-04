@@ -8,8 +8,15 @@ import {
 } from './constants.js';
 import { createJudgeLane } from './judgeLane.js';
 
-const SPAWN_INTERVAL_MS = 650;
+const SPAWN_INTERVAL_MS = 1200;
 let noteIdSeq = 0;
+
+function contrastTextColor(hex) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance > 0.6 ? '#1a1a1a' : '#ffffff';
+}
 
 // Layer 4: React + Canvas rendering. Owns notes, scoring, and combo state.
 // Exposes judgeLane(laneIdx) via ref so any input adapter — keyboard, mat,
@@ -106,10 +113,18 @@ const GameEngine = forwardRef(function GameEngine(_props, ref) {
         const progress = 1 - (note.hitTime - now) / travel;
         const y = progress * h;
         const x = note.laneIdx * laneW + laneW / 2;
+        const lane = LANES[note.laneIdx];
+
         ctx.beginPath();
         ctx.arc(x, y, NOTE_RADIUS, 0, Math.PI * 2);
-        ctx.fillStyle = LANES[note.laneIdx].color;
+        ctx.fillStyle = lane.color;
         ctx.fill();
+
+        ctx.font = `bold ${Math.round(NOTE_RADIUS * 1.1)}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = contrastTextColor(lane.color);
+        ctx.fillText(lane.arrow, x, y + 1);
       }
 
       const bandY = h * 0.82;
