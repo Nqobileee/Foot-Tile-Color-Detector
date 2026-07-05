@@ -15,6 +15,8 @@ import {
   saveHighScores,
   loadCalibration,
   saveCalibration,
+  loadFacingMode,
+  saveFacingMode,
 } from './content/storage.js';
 import { downloadTrainingZip } from './content/exportSession.js';
 
@@ -31,6 +33,7 @@ export default function App() {
   const [durationSec, setDurationSec] = useState(() => loadDurationSec());
   const [highScores, setHighScores] = useState(() => loadHighScores());
   const [calibration, setCalibration] = useState(() => loadCalibration());
+  const [facingMode, setFacingMode] = useState(() => loadFacingMode());
   const [lastResult, setLastResult] = useState(null); // { score, isNewHighScore }
   const engineRef = useRef(null);
   const capturesRef = useRef([]); // { blob, label, timestamp }[] — collected during play, for training
@@ -38,6 +41,11 @@ export default function App() {
   function handleChangeDuration(sec) {
     setDurationSec(sec);
     saveDurationSec(sec);
+  }
+
+  function handleChangeFacingMode(mode) {
+    setFacingMode(mode);
+    saveFacingMode(mode);
   }
 
   function handleChangeCalibration(patch) {
@@ -158,6 +166,7 @@ export default function App() {
           onCapture={phase === 'playing' ? handleCapture : undefined}
           calibration={calibration}
           onChangeCalibration={handleChangeCalibration}
+          facingMode={facingMode}
           style={
             phase === 'calibrating'
               ? { flex: '1 1 auto', minHeight: 0 }
@@ -181,6 +190,8 @@ export default function App() {
         <SettingsPanel
           durationSec={durationSec}
           onChangeDuration={handleChangeDuration}
+          facingMode={facingMode}
+          onChangeFacingMode={handleChangeFacingMode}
           onCalibrate={handleCalibrate}
           onClose={() => setSettingsOpen(false)}
         />

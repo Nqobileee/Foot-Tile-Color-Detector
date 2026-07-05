@@ -1,6 +1,10 @@
 const PRESETS_SEC = [30, 60, 90, 120];
+const CAMERAS = [
+  { value: 'environment', label: 'Back camera' },
+  { value: 'user', label: 'Front camera' },
+];
 
-export default function SettingsPanel({ durationSec, onChangeDuration, onCalibrate, onClose }) {
+export default function SettingsPanel({ durationSec, onChangeDuration, facingMode, onChangeFacingMode, onCalibrate, onClose }) {
   return (
     <div
       onClick={onClose}
@@ -48,6 +52,32 @@ export default function SettingsPanel({ durationSec, onChangeDuration, onCalibra
                 }}
               >
                 {sec}s
+              </button>
+            );
+          })}
+        </div>
+
+        <p style={{ margin: '0 0 8px', fontSize: 13, opacity: 0.65 }}>Camera</p>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+          {CAMERAS.map(({ value, label }) => {
+            const active = value === facingMode;
+            return (
+              <button
+                key={value}
+                type="button"
+                onClick={() => onChangeFacingMode(value)}
+                style={{
+                  flex: 1,
+                  padding: '10px 0',
+                  borderRadius: 10,
+                  border: active ? '1px solid #5FD4FF' : '1px solid rgba(255,255,255,0.15)',
+                  background: active ? 'rgba(95,212,255,0.18)' : 'rgba(255,255,255,0.04)',
+                  fontWeight: active ? 700 : 400,
+                  fontSize: 13,
+                  cursor: 'pointer',
+                }}
+              >
+                {label}
               </button>
             );
           })}

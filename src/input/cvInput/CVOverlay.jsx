@@ -34,6 +34,7 @@ export default function CVOverlay({
   onCapture,
   calibration = defaultZoneCalibration(),
   onChangeCalibration,
+  facingMode = 'environment',
 }) {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
@@ -82,7 +83,7 @@ export default function CVOverlay({
       if (cancelled) return;
 
       stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 } },
+        video: { facingMode: { ideal: facingMode }, width: { ideal: 1280 } },
         audio: false,
       });
       if (cancelled) return;
@@ -140,7 +141,7 @@ export default function CVOverlay({
       cancelAnimationFrame(raf);
       stream?.getTracks().forEach((t) => t.stop());
     };
-  }, [judgeLane]);
+  }, [judgeLane, facingMode]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', width: '100%', maxWidth: 640, margin: '0 auto', ...style }}>

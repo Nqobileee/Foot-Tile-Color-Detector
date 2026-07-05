@@ -6,7 +6,22 @@ import { defaultZoneCalibration } from '../game/constants.js';
 const DURATION_KEY = 'smart-step:durationSec';
 const HIGH_SCORES_KEY = 'smart-step:highScores';
 const CALIBRATION_KEY = 'smart-step:calibration';
+const FACING_MODE_KEY = 'smart-step:facingMode';
 export const DEFAULT_DURATION_SEC = 60;
+export const DEFAULT_FACING_MODE = 'environment'; // 'environment' = back camera, 'user' = front
+
+export function loadFacingMode() {
+  const raw = localStorage.getItem(FACING_MODE_KEY);
+  return raw === 'user' || raw === 'environment' ? raw : DEFAULT_FACING_MODE;
+}
+
+export function saveFacingMode(facingMode) {
+  try {
+    localStorage.setItem(FACING_MODE_KEY, facingMode);
+  } catch {
+    /* storage unavailable — setting just won't persist */
+  }
+}
 
 export function loadDurationSec() {
   const raw = Number(localStorage.getItem(DURATION_KEY));
