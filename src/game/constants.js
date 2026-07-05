@@ -9,18 +9,19 @@ export const LANES = [
 
 export const LANE_COUNT = LANES.length;
 
-// Normalized (0-1) zone bounding boxes for the CV input path. These match a
-// real reference photo of the mat shot from its typical camera angle/mount
-// (phone tilted, not directly overhead) — since red/blue/yellow/green sit at
-// right/bottom/top/left in that shot, that's baked in directly here rather
-// than relying on the rotate180 toggle. Still fully adjustable per-lane by
-// dragging, or globally via the tilt/size sliders, for any other mounting.
+// Normalized (0-1) zone bounding boxes for the CV input path: four equal
+// 0.34x0.34 squares in a non-overlapping plus/cross layout. Positioned so
+// red/blue/yellow/green land at right/bottom/top/left respectively, matching
+// a reference photo of the mat's typical camera angle/mount (phone tilted,
+// not directly overhead) — without baking in that photo's perspective-
+// skewed, unequal proportions. Still fully adjustable per-lane by dragging,
+// or globally via the tilt/size sliders, for any other mounting.
 // { x0, y0, x1, y1 } in normalized video coordinates.
 export const CV_ZONES = [
-  { laneIdx: 0, box: { x0: 0.58, y0: 0.63, x1: 0.855, y1: 0.76 } }, // left (red)
-  { laneIdx: 1, box: { x0: 0.34, y0: 0.76, x1: 0.64, y1: 0.91 } }, // up (blue)
-  { laneIdx: 2, box: { x0: 0.37, y0: 0.535, x1: 0.63, y1: 0.63 } }, // down (yellow)
-  { laneIdx: 3, box: { x0: 0.12, y0: 0.63, x1: 0.4, y1: 0.76 } }, // right (green)
+  { laneIdx: 0, box: { x0: 0.65, y0: 0.33, x1: 0.99, y1: 0.67 } }, // left (red) -> frame-right
+  { laneIdx: 1, box: { x0: 0.33, y0: 0.63, x1: 0.67, y1: 0.97 } }, // up (blue) -> frame-bottom
+  { laneIdx: 2, box: { x0: 0.33, y0: 0.03, x1: 0.67, y1: 0.37 } }, // down (yellow) -> frame-top
+  { laneIdx: 3, box: { x0: 0.01, y0: 0.33, x1: 0.35, y1: 0.67 } }, // right (green) -> frame-left
 ];
 
 // Per-lane, user-adjustable calibration for the CV zone grid. A camera
