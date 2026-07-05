@@ -17,3 +17,36 @@ body {
   color: #cfd8e3;
   font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
 }
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+@keyframes star-fall {
+  0% {
+    transform: translateY(-5vh);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 0.8;
+  }
+  100% {
+    transform: translateY(105vh);
+    opacity: 0;
+  }
+}
+
+@keyframes star-twinkle {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+

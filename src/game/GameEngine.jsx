@@ -37,15 +37,17 @@ function drawArrow(ctx, cx, cy, r, angle, color) {
   ctx.restore();
 }
 
-// Layer 4: React + Canvas rendering. Owns notes, scoring, and combo state.
-// Exposes judgeLane(laneIdx) via ref so any input adapter — keyboard, mat,
-// gamepad, or CV zone detection — can drive it identically.
-const GameEngine = forwardRef(function GameEngine({ style }, ref) {
+// Layer 4: React + Canvas rendering. Owns notes, scoring, combo, and the
+// round timer. Exposes judgeLane(laneIdx) via ref so any input adapter —
+// keyboard, mat, gamepad, or CV zone detection — can drive it identically.
+const GameEngine = forwardRef(function GameEngine({ style, durationSec = 60, onGameOver }, ref) {
   const canvasRef = useRef(null);
   const notesRef = useRef([]);
   const lastSpawnRef = useRef(0);
   const stepFlashRef = useRef(null); // { laneIdx, color, timestamp } — column glow on any step
   const circlesRef = useRef(0); // hit count, drawn big/bold on the canvas itself
+  const roundStartRef = useRef(0);
+  const endedRef = useRef(false);
   const [combo, setCombo] = useState(0);
   const [lastJudgement, setLastJudgement] = useState(null);
 
@@ -70,7 +72,9 @@ const GameEngine = forwardRef(function GameEngine({ style }, ref) {
   }
 
   useImperativeHandle(ref, () => ({
-    judgeLane: (laneIdx) => judgeLaneRef.current(laneIdx),
+    judgeLane: (laneIdx) => {
+      if (!endedRef.current) judgeLaneRef.current(laneIdx);
+    },
   }));
 
   useEffect(() => {
@@ -115,7 +119,7 @@ const GameEngine = forwardRef(function GameEngine({ style }, ref) {
       });
     }
 
-    function draw(now) {
+    function draw(now, timeLeftMs) {
       const w = canvas.width;
       const h = canvas.height;
       const laneW = w / LANE_COUNT;
@@ -160,17 +164,34 @@ const GameEngine = forwardRef(function GameEngine({ style }, ref) {
       ctx.strokeText(String(circlesRef.current), w / 2, 10);
       ctx.fillStyle = '#ffffff';
       ctx.fillText(String(circlesRef.current), w / 2, 10);
+
+      const secondsLeft = Math.max(0, Math.ceil(timeLeftMs / 1000));
+      ctx.font = 'bold 22px sans-serif';
+      ctx.textAlign = 'left';
+      ctx.strokeText(String(secondsLeft), 12, 12);
+      ctx.fillText(String(secondsLeft), 12, 12);
     }
 
     function loop(ts) {
       raf = requestAnimationFrame(loop);
-      if (!lastSpawnRef.current) lastSpawnRef.current = ts;
-      if (ts - lastSpawnRef.current >= SPAWN_INTERVAL_MS) {
-        lastSpawnRef.current = ts;
-        spawnNote(ts);
+      if (!roundStartRef.current) roundStartRef.current = ts;
+      const timeLeftMs = durationSec * 1000 - (ts - roundStartRef.current);
+
+      if (timeLeftMs <= 0 && !endedRef.current) {
+        endedRef.current = true;
+        onGameOver?.(circlesRef.current);
       }
-      sweepMissedNotes(ts);
-      draw(ts);
+
+      if (!endedRef.current) {
+        if (!lastSpawnRef.current) lastSpawnRef.current = ts;
+        if (ts - lastSpawnRef.current >= SPAWN_INTERVAL_MS) {
+          lastSpawnRef.current = ts;
+          spawnNote(ts);
+        }
+        sweepMissedNotes(ts);
+      }
+
+      draw(ts, timeLeftMs);
     }
     raf = requestAnimationFrame(loop);
 
@@ -178,7 +199,7 @@ const GameEngine = forwardRef(function GameEngine({ style }, ref) {
       cancelAnimationFrame(raf);
       observer.disconnect();
     };
-  }, []);
+  }, [durationSec, onGameOver]);
 
   return (
     <div
