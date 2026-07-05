@@ -5,7 +5,9 @@ import HomePage from './ui/HomePage.jsx';
 import WikiPage from './ui/WikiPage.jsx';
 import SettingsPanel from './ui/SettingsPanel.jsx';
 import GameOverScreen from './ui/GameOverScreen.jsx';
+import HomeIcon from './ui/HomeIcon.jsx';
 import { GAME_MODES } from './content/modes.js';
+import { playClick } from './content/sound.js';
 import {
   loadDurationSec,
   saveDurationSec,
@@ -89,6 +91,35 @@ export default function App() {
 
   return (
     <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', height: '100dvh', width: '100%', overflow: 'hidden' }}>
+      {(phase === 'playing' || phase === 'calibrating') && (
+        <button
+          type="button"
+          onClick={() => {
+            playClick();
+            setPhase('home');
+          }}
+          aria-label="Home"
+          style={{
+            position: 'absolute',
+            zIndex: 6,
+            top: 12,
+            left: 12,
+            width: 36,
+            height: 36,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: 10,
+            border: '1px solid rgba(255,255,255,0.25)',
+            background: 'rgba(11,7,21,0.6)',
+            backdropFilter: 'blur(4px)',
+            cursor: 'pointer',
+          }}
+        >
+          <HomeIcon />
+        </button>
+      )}
+
       {phase === 'home' && (
         <HomePage onSelectMode={handleSelectMode} onOpenSettings={() => setSettingsOpen(true)} highScores={highScores} />
       )}
