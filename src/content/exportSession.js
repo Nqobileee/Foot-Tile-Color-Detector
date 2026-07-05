@@ -37,7 +37,7 @@ export async function downloadTrainingZip({ mode, score, durationSec, captures }
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `nutri-step-session-${Date.now()}.zip`;
+  a.download = `smart-step-session-${Date.now()}.zip`;
   document.body.appendChild(a);
   a.click();
   a.remove();

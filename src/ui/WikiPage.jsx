@@ -1,5 +1,10 @@
 import { LANES } from '../game/constants.js';
 import StarsBackground from './StarsBackground.jsx';
+import { playClick } from '../content/sound.js';
+
+function capitalize(s) {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
 
 export default function WikiPage({ mode, onBack, onStart }) {
   return (
@@ -8,7 +13,10 @@ export default function WikiPage({ mode, onBack, onStart }) {
       <div style={{ position: 'relative', zIndex: 1, maxWidth: 480, margin: '0 auto', padding: '20px 16px 40px' }}>
         <button
           type="button"
-          onClick={onBack}
+          onClick={() => {
+            playClick();
+            onBack();
+          }}
           style={{
             padding: '8px 14px',
             borderRadius: 10,
@@ -61,14 +69,20 @@ export default function WikiPage({ mode, onBack, onStart }) {
                   boxShadow: `0 0 10px ${lane.color}88`,
                 }}
               />
-              <strong style={{ fontSize: 15 }}>{mode.legend[lane.idx]}</strong>
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <strong style={{ fontSize: 15 }}>{mode.legend[lane.idx]}</strong>
+                <span style={{ fontSize: 11, opacity: 0.6 }}>{capitalize(lane.colorName)}</span>
+              </div>
             </div>
           ))}
         </div>
 
         <button
           type="button"
-          onClick={onStart}
+          onClick={() => {
+            playClick();
+            onStart();
+          }}
           style={{
             display: 'block',
             width: '100%',

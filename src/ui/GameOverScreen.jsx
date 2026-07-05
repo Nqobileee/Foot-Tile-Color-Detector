@@ -1,4 +1,5 @@
 import StarsBackground from './StarsBackground.jsx';
+import { playClick } from '../content/sound.js';
 
 export default function GameOverScreen({ mode, score, highScore, isNewHighScore, captureCount, onDownload, onPlayAgain, onHome }) {
   return (
@@ -65,7 +66,10 @@ export default function GameOverScreen({ mode, score, highScore, isNewHighScore,
 
         <button
           type="button"
-          onClick={onPlayAgain}
+          onClick={() => {
+            playClick();
+            onPlayAgain();
+          }}
           style={{
             width: '100%',
             padding: '16px',
@@ -83,7 +87,10 @@ export default function GameOverScreen({ mode, score, highScore, isNewHighScore,
         </button>
         <button
           type="button"
-          onClick={onHome}
+          onClick={() => {
+            playClick();
+            onHome();
+          }}
           style={{
             width: '100%',
             padding: '14px',

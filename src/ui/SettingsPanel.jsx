@@ -1,6 +1,6 @@
 const PRESETS_SEC = [30, 60, 90, 120];
 
-export default function SettingsPanel({ durationSec, onChangeDuration, onClose }) {
+export default function SettingsPanel({ durationSec, onChangeDuration, onCalibrate, onClose }) {
   return (
     <div
       onClick={onClose}
@@ -52,6 +52,24 @@ export default function SettingsPanel({ durationSec, onChangeDuration, onClose }
             );
           })}
         </div>
+
+        <button
+          type="button"
+          onClick={onCalibrate}
+          style={{
+            display: 'block',
+            width: '100%',
+            padding: '12px',
+            borderRadius: 12,
+            border: '1px solid rgba(255,255,255,0.15)',
+            background: 'rgba(255,255,255,0.04)',
+            fontWeight: 600,
+            cursor: 'pointer',
+            marginBottom: 10,
+          }}
+        >
+          Calibrate Camera
+        </button>
 
         <button
           type="button"

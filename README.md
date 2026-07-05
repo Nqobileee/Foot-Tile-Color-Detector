@@ -1,4 +1,4 @@
-# Nutri-Step
+# Smart Step
 
 A DDR-style rhythm game built per [architecture.md](architecture.md): an input-agnostic
 game engine that accepts hits from keyboard, a gamepad-style dance mat, an FSR mat

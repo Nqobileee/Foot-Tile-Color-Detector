@@ -9,6 +9,7 @@ import {
   ZONE_GLOBAL_SCALE_DEFAULT,
   ZONE_GLOBAL_SCALE_MIN,
   ZONE_GLOBAL_SCALE_MAX,
+  defaultZoneCalibration,
   effectiveZoneBox,
   rotateZoneBox180,
 } from '../../game/constants.js';
@@ -20,7 +21,20 @@ import { detectZonesFromFrame } from './colorCalibration.js';
 // as a self-contained input adapter component. Renders the webcam feed with
 // a debug overlay (zone boxes + skeleton) and drives judgeLane(laneIdx) —
 // the game engine behind it has no idea a camera is involved.
-export default function CVOverlay({ judgeLane, style, calibrating = false, onDoneCalibrating, compact = false, onCapture }) {
+//
+// `calibration`/`onChangeCalibration` are lifted up to the App level (rather
+// than owned here) so calibration set from Settings survives this component
+// unmounting and remounting when the camera stops between screens.
+export default function CVOverlay({
+  judgeLane,
+  style,
+  calibrating = false,
+  onDoneCalibrating,
+  compact = false,
+  onCapture,
+  calibration = defaultZoneCalibration(),
+  onChangeCalibration,
+}) {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const onCaptureRef = useRef(onCapture);
@@ -29,30 +43,26 @@ export default function CVOverlay({ judgeLane, style, calibrating = false, onDon
   }, [onCapture]);
   const [status, setStatus] = useState('Loading pose model…');
   const [panelOpen, setPanelOpen] = useState(false);
-  const [globalScale, setGlobalScale] = useState(ZONE_GLOBAL_SCALE_DEFAULT);
-  const [zoneAdjust, setZoneAdjust] = useState(() => LANES.map(() => ({ ...ZONE_ADJUST_DEFAULT })));
-  const [autoBoxes, setAutoBoxes] = useState(null); // per-lane detected box, or null per-lane if not found
-  const [rotate180, setRotate180] = useState(false); // back camera facing the player vs. facing away
-  const calibrationRef = useRef({ globalScale, perLane: zoneAdjust, autoBoxes, rotate180 });
+  const calibrationRef = useRef(calibration);
   useEffect(() => {
-    calibrationRef.current = { globalScale, perLane: zoneAdjust, autoBoxes, rotate180 };
-  }, [globalScale, zoneAdjust, autoBoxes, rotate180]);
+    calibrationRef.current = calibration;
+  }, [calibration]);
 
   const panelVisible = calibrating || panelOpen;
 
   function updateZoneAdjust(laneIdx, patch) {
-    setZoneAdjust((prev) => prev.map((a, i) => (i === laneIdx ? { ...a, ...patch } : a)));
+    onChangeCalibration?.({
+      perLane: calibration.perLane.map((a, i) => (i === laneIdx ? { ...a, ...patch } : a)),
+    });
   }
 
   function resetAll() {
-    setGlobalScale(ZONE_GLOBAL_SCALE_DEFAULT);
-    setZoneAdjust(LANES.map(() => ({ ...ZONE_ADJUST_DEFAULT })));
-    setAutoBoxes(null);
+    onChangeCalibration?.(defaultZoneCalibration());
   }
 
   function calibrateEmptyMat() {
-    const detected = detectZonesFromFrame(videoRef.current, rotate180);
-    setAutoBoxes(detected);
+    const detected = detectZonesFromFrame(videoRef.current, calibration.rotate180);
+    onChangeCalibration?.({ autoBoxes: detected });
     const found = LANES.filter((l) => detected[l.idx]).map((l) => l.name);
     const missing = LANES.filter((l) => !detected[l.idx]).map((l) => l.name);
     setStatus(
@@ -178,19 +188,23 @@ export default function CVOverlay({ judgeLane, style, calibrating = false, onDon
             </button>
 
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, marginBottom: 8 }}>
-              <input type="checkbox" checked={rotate180} onChange={(e) => setRotate180(e.target.checked)} />
+              <input
+                type="checkbox"
+                checked={calibration.rotate180}
+                onChange={(e) => onChangeCalibration?.({ rotate180: e.target.checked })}
+              />
               Camera facing me (invert up/down/left/right)
             </label>
 
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, marginBottom: 8 }}>
-              All zones size: {Math.round(globalScale * 100)}%
+              All zones size: {Math.round(calibration.globalScale * 100)}%
               <input
                 type="range"
                 min={ZONE_GLOBAL_SCALE_MIN}
                 max={ZONE_GLOBAL_SCALE_MAX}
                 step={0.05}
-                value={globalScale}
-                onChange={(e) => setGlobalScale(Number(e.target.value))}
+                value={calibration.globalScale}
+                onChange={(e) => onChangeCalibration?.({ globalScale: Number(e.target.value) })}
                 style={{ flex: 1 }}
               />
             </label>
@@ -209,7 +223,7 @@ export default function CVOverlay({ judgeLane, style, calibrating = false, onDon
                       min={-ZONE_OFFSET_RANGE}
                       max={ZONE_OFFSET_RANGE}
                       step={0.01}
-                      value={zoneAdjust[lane.idx].offsetX}
+                      value={calibration.perLane[lane.idx].offsetX}
                       onChange={(e) => updateZoneAdjust(lane.idx, { offsetX: Number(e.target.value) })}
                       style={{ flex: 1 }}
                     />
@@ -221,7 +235,7 @@ export default function CVOverlay({ judgeLane, style, calibrating = false, onDon
                       min={-ZONE_OFFSET_RANGE}
                       max={ZONE_OFFSET_RANGE}
                       step={0.01}
-                      value={zoneAdjust[lane.idx].offsetY}
+                      value={calibration.perLane[lane.idx].offsetY}
                       onChange={(e) => updateZoneAdjust(lane.idx, { offsetY: Number(e.target.value) })}
                       style={{ flex: 1 }}
                     />
@@ -233,7 +247,7 @@ export default function CVOverlay({ judgeLane, style, calibrating = false, onDon
                       min={ZONE_SCALE_MIN}
                       max={ZONE_SCALE_MAX}
                       step={0.05}
-                      value={zoneAdjust[lane.idx].scale}
+                      value={calibration.perLane[lane.idx].scale}
                       onChange={(e) => updateZoneAdjust(lane.idx, { scale: Number(e.target.value) })}
                       style={{ flex: 1 }}
                     />

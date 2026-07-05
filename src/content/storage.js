@@ -1,8 +1,11 @@
-// Small localStorage-backed persistence for user settings and high scores.
-// Falls back to sane defaults if storage is unavailable (private browsing,
-// SSR, etc.) rather than throwing.
-const DURATION_KEY = 'nutri-step:durationSec';
-const HIGH_SCORES_KEY = 'nutri-step:highScores';
+import { defaultZoneCalibration } from '../game/constants.js';
+
+// Small localStorage-backed persistence for user settings, high scores, and
+// CV calibration. Falls back to sane defaults if storage is unavailable
+// (private browsing, SSR, etc.) rather than throwing.
+const DURATION_KEY = 'smart-step:durationSec';
+const HIGH_SCORES_KEY = 'smart-step:highScores';
+const CALIBRATION_KEY = 'smart-step:calibration';
 export const DEFAULT_DURATION_SEC = 60;
 
 export function loadDurationSec() {
@@ -31,5 +34,22 @@ export function saveHighScores(scores) {
     localStorage.setItem(HIGH_SCORES_KEY, JSON.stringify(scores));
   } catch {
     /* storage unavailable — high scores just won't persist */
+  }
+}
+
+export function loadCalibration() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(CALIBRATION_KEY));
+    return raw ?? defaultZoneCalibration();
+  } catch {
+    return defaultZoneCalibration();
+  }
+}
+
+export function saveCalibration(calibration) {
+  try {
+    localStorage.setItem(CALIBRATION_KEY, JSON.stringify(calibration));
+  } catch {
+    /* storage unavailable — calibration just won't persist */
   }
 }

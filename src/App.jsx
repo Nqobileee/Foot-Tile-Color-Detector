@@ -6,22 +6,30 @@ import WikiPage from './ui/WikiPage.jsx';
 import SettingsPanel from './ui/SettingsPanel.jsx';
 import GameOverScreen from './ui/GameOverScreen.jsx';
 import { GAME_MODES } from './content/modes.js';
-import { loadDurationSec, saveDurationSec, loadHighScores, saveHighScores } from './content/storage.js';
+import {
+  loadDurationSec,
+  saveDurationSec,
+  loadHighScores,
+  saveHighScores,
+  loadCalibration,
+  saveCalibration,
+} from './content/storage.js';
 import { downloadTrainingZip } from './content/exportSession.js';
 
 // Computer vision is the only input adapter now: Layers 1-3 (webcam, pose
 // estimation, zone detection) always drive Layer 4 (GameEngine) through
 // judgeLane(laneIdx). CVOverlay stays mounted across calibrating <-> playing
 // so it never has to reconnect the camera / reload the pose model mid-round.
+// Calibration itself lives entirely behind Settings — it no longer blocks
+// starting a game.
 export default function App() {
   const [phase, setPhase] = useState('home'); // 'home' | 'wiki' | 'calibrating' | 'playing' | 'gameover'
   const [selectedMode, setSelectedMode] = useState(GAME_MODES[0]);
-  const [calibrated, setCalibrated] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [durationSec, setDurationSec] = useState(() => loadDurationSec());
   const [highScores, setHighScores] = useState(() => loadHighScores());
+  const [calibration, setCalibration] = useState(() => loadCalibration());
   const [lastResult, setLastResult] = useState(null); // { score, isNewHighScore }
-  const calibrateReturnTo = useRef('home');
   const engineRef = useRef(null);
   const capturesRef = useRef([]); // { blob, label, timestamp }[] — collected during play, for training
 
@@ -30,8 +38,16 @@ export default function App() {
     saveDurationSec(sec);
   }
 
+  function handleChangeCalibration(patch) {
+    setCalibration((prev) => {
+      const next = { ...prev, ...patch };
+      saveCalibration(next);
+      return next;
+    });
+  }
+
   function handleCalibrate() {
-    calibrateReturnTo.current = 'home';
+    setSettingsOpen(false);
     setPhase('calibrating');
   }
 
@@ -45,19 +61,8 @@ export default function App() {
     setPhase('playing');
   }
 
-  function handleStartGame() {
-    if (calibrated) {
-      beginRound();
-    } else {
-      calibrateReturnTo.current = 'playing';
-      setPhase('calibrating');
-    }
-  }
-
   function handleDoneCalibrating() {
-    setCalibrated(true);
-    if (calibrateReturnTo.current === 'playing') beginRound();
-    else setPhase('home');
+    setPhase('home');
   }
 
   function handleCapture(blob, label) {
@@ -85,10 +90,10 @@ export default function App() {
   return (
     <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', height: '100dvh', width: '100%', overflow: 'hidden' }}>
       {phase === 'home' && (
-        <HomePage onCalibrate={handleCalibrate} onSelectMode={handleSelectMode} onOpenSettings={() => setSettingsOpen(true)} />
+        <HomePage onSelectMode={handleSelectMode} onOpenSettings={() => setSettingsOpen(true)} highScores={highScores} />
       )}
 
-      {phase === 'wiki' && <WikiPage mode={selectedMode} onBack={() => setPhase('home')} onStart={handleStartGame} />}
+      {phase === 'wiki' && <WikiPage mode={selectedMode} onBack={() => setPhase('home')} onStart={beginRound} />}
 
       {phase === 'gameover' && lastResult && (
         <GameOverScreen
@@ -104,7 +109,13 @@ export default function App() {
       )}
 
       {phase === 'playing' && (
-        <GameEngine ref={engineRef} durationSec={durationSec} onGameOver={handleGameOver} style={{ flex: '1 1 auto', minHeight: 0 }} />
+        <GameEngine
+          ref={engineRef}
+          durationSec={durationSec}
+          onGameOver={handleGameOver}
+          mode={selectedMode}
+          style={{ flex: '1 1 auto', minHeight: 0 }}
+        />
       )}
 
       {showCamera && (
@@ -114,6 +125,8 @@ export default function App() {
           onDoneCalibrating={handleDoneCalibrating}
           compact={phase === 'playing'}
           onCapture={phase === 'playing' ? handleCapture : undefined}
+          calibration={calibration}
+          onChangeCalibration={handleChangeCalibration}
           style={
             phase === 'calibrating'
               ? { flex: '1 1 auto', minHeight: 0 }
@@ -134,7 +147,12 @@ export default function App() {
       )}
 
       {settingsOpen && (
-        <SettingsPanel durationSec={durationSec} onChangeDuration={handleChangeDuration} onClose={() => setSettingsOpen(false)} />
+        <SettingsPanel
+          durationSec={durationSec}
+          onChangeDuration={handleChangeDuration}
+          onCalibrate={handleCalibrate}
+          onClose={() => setSettingsOpen(false)}
+        />
       )}
     </div>
   );

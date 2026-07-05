@@ -61,6 +61,18 @@ export function effectiveZoneBox(box, globalScale, laneAdjust) {
   return adjustedZoneBox(scaledZoneBox(box, globalScale), laneAdjust);
 }
 
+// Default shape for the full CV calibration bundle — lifted up to App level
+// (rather than owned locally by CVOverlay) so it survives the camera
+// unmounting/remounting between calibrating (from Settings) and playing.
+export function defaultZoneCalibration() {
+  return {
+    globalScale: ZONE_GLOBAL_SCALE_DEFAULT,
+    perLane: LANES.map(() => ({ ...ZONE_ADJUST_DEFAULT })),
+    autoBoxes: null,
+    rotate180: false,
+  };
+}
+
 // Some camera mountings show the mat rotated 180° from how the player
 // standing on it perceives up/down/left/right (e.g. camera facing the
 // player from the far side, or mounted upside-down). This remaps a default

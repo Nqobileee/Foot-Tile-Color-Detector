@@ -46,4 +46,10 @@ export const GAME_MODES = [
     tagline: 'Which class am I stepping on?',
     legend: ['Mammals', 'Fish', 'Birds', 'Reptiles'],
   },
+  {
+    id: 'music',
+    title: 'Music',
+    tagline: 'Feel the beat in every step.',
+    legend: ['Bass', 'Drums', 'Vocals', 'Guitar'],
+  },
 ];
