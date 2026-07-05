@@ -84,7 +84,7 @@ export function rotateZoneBox180(box) {
 }
 
 // Render loop / note timing
-export const SCROLL_SPEED_PX_PER_SEC = 140;
+export const SCROLL_SPEED_PX_PER_SEC = 90;
 export const NOTE_RADIUS = 22;
 export const STEP_FLASH_DURATION_MS = 900; // how long the column glow lingers
 

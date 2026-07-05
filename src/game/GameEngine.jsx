@@ -9,7 +9,7 @@ import {
 import { createJudgeLane } from './judgeLane.js';
 import { playHit, playMiss, playGameOver, playRoundStart } from '../content/sound.js';
 
-const SPAWN_INTERVAL_MS = 1700;
+const SPAWN_INTERVAL_MS = 2200;
 let noteIdSeq = 0;
 
 // Bold, chunky 2D arrow (chevron head + thick shaft) — drawn as a filled
@@ -42,18 +42,29 @@ function drawArrow(ctx, cx, cy, r, angle, color) {
 
 // Themed modes: big bold text, no background chip, no lane color — the
 // lane's column position already carries the color meaning, so the word
-// itself stays neutral (white) with a soft dark outline for legibility.
-// Font size scales down for longer words so they don't overrun the lane.
+// itself stays neutral (white) with a neon-style glow instead. Font size
+// scales down for longer words so they don't overrun the lane.
 function drawLabelText(ctx, cx, cy, r, text) {
   const fontSize = Math.round(Math.max(15, Math.min(27, (r * 4.6) / Math.max(text.length, 4))));
   ctx.save();
   ctx.font = `800 ${fontSize}px sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.lineWidth = 4;
-  ctx.strokeStyle = 'rgba(0,0,0,0.75)';
-  ctx.strokeText(text, cx, cy);
+
+  // Layered glow halo (brand cyan + purple) built up behind the text.
   ctx.fillStyle = '#ffffff';
+  ctx.shadowColor = '#9B4DFF';
+  ctx.shadowBlur = 22;
+  ctx.fillText(text, cx, cy);
+  ctx.shadowColor = '#5FD4FF';
+  ctx.shadowBlur = 14;
+  ctx.fillText(text, cx, cy);
+
+  // Crisp final pass on top, shadow off, so the letters stay sharp.
+  ctx.shadowBlur = 0;
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = 'rgba(0,0,0,0.6)';
+  ctx.strokeText(text, cx, cy);
   ctx.fillText(text, cx, cy);
   ctx.restore();
 }
