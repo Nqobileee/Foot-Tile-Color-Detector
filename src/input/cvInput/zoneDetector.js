@@ -15,7 +15,7 @@ function zoneForPoint(nx, ny, calibration) {
   const zone = CV_ZONES.find(({ laneIdx, box }) => {
     const defaultBox = calibration.rotate180 ? rotateZoneBox180(box) : box;
     const baseBox = calibration.autoBoxes?.[laneIdx]?.box ?? defaultBox;
-    const b = effectiveZoneBox(baseBox, calibration.globalScale, calibration.perLane[laneIdx]);
+    const b = effectiveZoneBox(baseBox, calibration, calibration.perLane[laneIdx]);
     return nx >= b.x0 && nx <= b.x1 && ny >= b.y0 && ny <= b.y1;
   });
   return zone ? zone.laneIdx : null;

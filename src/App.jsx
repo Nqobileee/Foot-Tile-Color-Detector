@@ -34,7 +34,6 @@ export default function App() {
   const [highScores, setHighScores] = useState(() => loadHighScores());
   const [calibration, setCalibration] = useState(() => loadCalibration());
   const [facingMode, setFacingMode] = useState(() => loadFacingMode());
-  const [autoCalibrate, setAutoCalibrate] = useState(false);
   const [lastResult, setLastResult] = useState(null); // { score, isNewHighScore }
   const engineRef = useRef(null);
   const capturesRef = useRef([]); // { blob, label, timestamp }[] — collected during play, for training
@@ -59,13 +58,6 @@ export default function App() {
 
   function handleCalibrate() {
     setSettingsOpen(false);
-    setAutoCalibrate(false);
-    setPhase('calibrating');
-  }
-
-  function handleQuickCalibrate() {
-    setSettingsOpen(false);
-    setAutoCalibrate(true);
     setPhase('calibrating');
   }
 
@@ -80,7 +72,6 @@ export default function App() {
   }
 
   function handleDoneCalibrating() {
-    setAutoCalibrate(false);
     setPhase('home');
   }
 
@@ -176,7 +167,6 @@ export default function App() {
           calibration={calibration}
           onChangeCalibration={handleChangeCalibration}
           facingMode={facingMode}
-          autoCalibrate={autoCalibrate}
           style={
             phase === 'calibrating'
               ? { flex: '1 1 auto', minHeight: 0 }
@@ -203,7 +193,6 @@ export default function App() {
           facingMode={facingMode}
           onChangeFacingMode={handleChangeFacingMode}
           onCalibrate={handleCalibrate}
-          onQuickCalibrate={handleQuickCalibrate}
           onClose={() => setSettingsOpen(false)}
         />
       )}

@@ -35,12 +35,32 @@ export const ZONE_GLOBAL_SCALE_DEFAULT = 1;
 export const ZONE_GLOBAL_SCALE_MIN = 0.3;
 export const ZONE_GLOBAL_SCALE_MAX = 2;
 
+// Global tilt compensation for a camera that isn't directly overhead (angled
+// left/right and/or tilted forward/back). Approximated as a shear: each
+// zone's box shifts in proportion to how far it already sits from the frame
+// center, rather than needing full perspective/homography math.
+export const ZONE_TILT_DEFAULT = 0;
+export const ZONE_TILT_RANGE = 0.6; // max shear in either direction
+
 export function scaledZoneBox(box, scale) {
   return {
     x0: 0.5 + (box.x0 - 0.5) * scale,
     x1: 0.5 + (box.x1 - 0.5) * scale,
     y0: 0.5 + (box.y0 - 0.5) * scale,
     y1: 0.5 + (box.y1 - 0.5) * scale,
+  };
+}
+
+export function tiltedZoneBox(box, tiltX, tiltY) {
+  const cx = (box.x0 + box.x1) / 2;
+  const cy = (box.y0 + box.y1) / 2;
+  const shiftX = tiltX * (cy - 0.5);
+  const shiftY = tiltY * (cx - 0.5);
+  return {
+    x0: box.x0 + shiftX,
+    x1: box.x1 + shiftX,
+    y0: box.y0 + shiftY,
+    y1: box.y1 + shiftY,
   };
 }
 
@@ -56,9 +76,12 @@ export function adjustedZoneBox(box, adjust) {
   };
 }
 
-// Composes the global grid resize with each zone's own independent nudge.
-export function effectiveZoneBox(box, globalScale, laneAdjust) {
-  return adjustedZoneBox(scaledZoneBox(box, globalScale), laneAdjust);
+// Composes the global grid resize + tilt with each zone's own independent
+// nudge (from dragging/resizing it directly, or the old slider values).
+export function effectiveZoneBox(box, calibration, laneAdjust) {
+  const scaled = scaledZoneBox(box, calibration.globalScale);
+  const tilted = tiltedZoneBox(scaled, calibration.tiltX ?? ZONE_TILT_DEFAULT, calibration.tiltY ?? ZONE_TILT_DEFAULT);
+  return adjustedZoneBox(tilted, laneAdjust);
 }
 
 // Default shape for the full CV calibration bundle — lifted up to App level
@@ -67,6 +90,8 @@ export function effectiveZoneBox(box, globalScale, laneAdjust) {
 export function defaultZoneCalibration() {
   return {
     globalScale: ZONE_GLOBAL_SCALE_DEFAULT,
+    tiltX: ZONE_TILT_DEFAULT,
+    tiltY: ZONE_TILT_DEFAULT,
     perLane: LANES.map(() => ({ ...ZONE_ADJUST_DEFAULT })),
     autoBoxes: null,
     rotate180: false,

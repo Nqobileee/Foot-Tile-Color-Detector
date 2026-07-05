@@ -10,7 +10,6 @@ export default function SettingsPanel({
   facingMode,
   onChangeFacingMode,
   onCalibrate,
-  onQuickCalibrate,
   onClose,
 }) {
   return (
@@ -93,24 +92,6 @@ export default function SettingsPanel({
 
         <button
           type="button"
-          onClick={onQuickCalibrate}
-          style={{
-            display: 'block',
-            width: '100%',
-            padding: '12px',
-            borderRadius: 12,
-            border: '1px solid rgba(31,174,74,0.5)',
-            background: 'rgba(31,174,74,0.15)',
-            fontWeight: 700,
-            cursor: 'pointer',
-            marginBottom: 10,
-          }}
-        >
-          Quick Calibrate
-        </button>
-
-        <button
-          type="button"
           onClick={onCalibrate}
           style={{
             display: 'block',
@@ -124,7 +105,7 @@ export default function SettingsPanel({
             marginBottom: 10,
           }}
         >
-          Calibrate Camera (manual)
+          Calibrate Camera
         </button>
 
         <button

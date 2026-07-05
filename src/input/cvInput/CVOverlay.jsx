@@ -2,13 +2,12 @@ import { useEffect, useRef, useState } from 'react';
 import {
   CV_ZONES,
   LANES,
-  ZONE_ADJUST_DEFAULT,
   ZONE_OFFSET_RANGE,
   ZONE_SCALE_MIN,
   ZONE_SCALE_MAX,
-  ZONE_GLOBAL_SCALE_DEFAULT,
   ZONE_GLOBAL_SCALE_MIN,
   ZONE_GLOBAL_SCALE_MAX,
+  ZONE_TILT_RANGE,
   defaultZoneCalibration,
   effectiveZoneBox,
   rotateZoneBox180,
@@ -17,6 +16,43 @@ import { loadPoseModel, estimatePose } from './poseModel.js';
 import { createZoneDetector } from './zoneDetector.js';
 import { detectZonesFromFrame } from './colorCalibration.js';
 
+const RESIZE_HANDLE_CSS_RADIUS = 26; // touch target size, in CSS px, regardless of video resolution
+
+function clamp(v, min, max) {
+  return Math.min(max, Math.max(min, v));
+}
+
+// A camera's rendered box uses object-fit:cover, which scales+crops the
+// buffer to fill it — this inverts that so pointer coordinates map back to
+// the same normalized (0-1) space the zone boxes are defined in.
+function clientToNormalized(canvas, clientX, clientY) {
+  const rect = canvas.getBoundingClientRect();
+  const bufferW = canvas.width;
+  const bufferH = canvas.height;
+  const scale = Math.max(rect.width / bufferW, rect.height / bufferH);
+  const renderedW = bufferW * scale;
+  const renderedH = bufferH * scale;
+  const cropX = (renderedW - rect.width) / 2;
+  const cropY = (renderedH - rect.height) / 2;
+  const bufX = (clientX - rect.left + cropX) / scale;
+  const bufY = (clientY - rect.top + cropY) / scale;
+  return { nx: bufX / bufferW, ny: bufY / bufferH, scale };
+}
+
+function bufferDist(nx, ny, cxN, cyN, bufferW, bufferH) {
+  const dx = (nx - cxN) * bufferW;
+  const dy = (ny - cyN) * bufferH;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+function getLaneBox(laneIdx, calibration) {
+  const zone = CV_ZONES.find((z) => z.laneIdx === laneIdx);
+  const detected = calibration.autoBoxes?.[laneIdx];
+  const defaultBox = calibration.rotate180 ? rotateZoneBox180(zone.box) : zone.box;
+  const baseBox = detected?.box ?? defaultBox;
+  return effectiveZoneBox(baseBox, calibration, calibration.perLane[laneIdx]);
+}
+
 // Layer 1 (webcam) + Layers 2-3 (pose estimation, zone detection), wrapped
 // as a self-contained input adapter component. Renders the webcam feed with
 // a debug overlay (zone boxes + skeleton) and drives judgeLane(laneIdx) —
@@ -24,7 +60,9 @@ import { detectZonesFromFrame } from './colorCalibration.js';
 //
 // `calibration`/`onChangeCalibration` are lifted up to the App level (rather
 // than owned here) so calibration set from Settings survives this component
-// unmounting and remounting when the camera stops between screens.
+// unmounting and remounting when the camera stops between screens. Each
+// zone box can be dragged (move) or dragged from its corner (resize) right
+// on top of the video — no sliders needed for the common case.
 export default function CVOverlay({
   judgeLane,
   style,
@@ -35,10 +73,10 @@ export default function CVOverlay({
   calibration = defaultZoneCalibration(),
   onChangeCalibration,
   facingMode = 'environment',
-  autoCalibrate = false,
 }) {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
+  const dragRef = useRef(null);
   const onCaptureRef = useRef(onCapture);
   useEffect(() => {
     onCaptureRef.current = onCapture;
@@ -51,6 +89,10 @@ export default function CVOverlay({
   }, [calibration]);
 
   const panelVisible = calibrating || panelOpen;
+  const panelVisibleRef = useRef(panelVisible);
+  useEffect(() => {
+    panelVisibleRef.current = panelVisible;
+  }, [panelVisible]);
 
   function updateZoneAdjust(laneIdx, patch) {
     onChangeCalibration?.({
@@ -72,6 +114,77 @@ export default function CVOverlay({
         ? 'No tile colors found — make sure the mat is empty and well lit, then try again.'
         : `Detected: ${found.join(', ')}.` + (missing.length ? ` Not found: ${missing.join(', ')} (using default box).` : '')
     );
+  }
+
+  function handlePointerDown(e) {
+    if (!panelVisible) return;
+    const canvas = canvasRef.current;
+    const { nx, ny, scale } = clientToNormalized(canvas, e.clientX, e.clientY);
+    const bufferW = canvas.width;
+    const bufferH = canvas.height;
+    const handleThreshold = RESIZE_HANDLE_CSS_RADIUS / scale;
+
+    for (const lane of LANES) {
+      const b = getLaneBox(lane.idx, calibration);
+      if (bufferDist(nx, ny, b.x1, b.y1, bufferW, bufferH) <= handleThreshold) {
+        const centerNx = (b.x0 + b.x1) / 2;
+        const centerNy = (b.y0 + b.y1) / 2;
+        dragRef.current = {
+          laneIdx: lane.idx,
+          mode: 'resize',
+          centerNx,
+          centerNy,
+          startScale: calibration.perLane[lane.idx].scale,
+          startDist: bufferDist(nx, ny, centerNx, centerNy, bufferW, bufferH) || 1,
+        };
+        canvas.setPointerCapture(e.pointerId);
+        return;
+      }
+    }
+
+    for (const lane of LANES) {
+      const b = getLaneBox(lane.idx, calibration);
+      if (nx >= b.x0 && nx <= b.x1 && ny >= b.y0 && ny <= b.y1) {
+        dragRef.current = {
+          laneIdx: lane.idx,
+          mode: 'move',
+          startNx: nx,
+          startNy: ny,
+          startOffsetX: calibration.perLane[lane.idx].offsetX,
+          startOffsetY: calibration.perLane[lane.idx].offsetY,
+        };
+        canvas.setPointerCapture(e.pointerId);
+        return;
+      }
+    }
+  }
+
+  function handlePointerMove(e) {
+    const drag = dragRef.current;
+    if (!drag) return;
+    const canvas = canvasRef.current;
+    const { nx, ny } = clientToNormalized(canvas, e.clientX, e.clientY);
+
+    if (drag.mode === 'move') {
+      updateZoneAdjust(drag.laneIdx, {
+        offsetX: clamp(drag.startOffsetX + (nx - drag.startNx), -ZONE_OFFSET_RANGE, ZONE_OFFSET_RANGE),
+        offsetY: clamp(drag.startOffsetY + (ny - drag.startNy), -ZONE_OFFSET_RANGE, ZONE_OFFSET_RANGE),
+      });
+    } else {
+      const dist = bufferDist(nx, ny, drag.centerNx, drag.centerNy, canvas.width, canvas.height) || 1;
+      updateZoneAdjust(drag.laneIdx, {
+        scale: clamp(drag.startScale * (dist / drag.startDist), ZONE_SCALE_MIN, ZONE_SCALE_MAX),
+      });
+    }
+  }
+
+  function handlePointerUp(e) {
+    dragRef.current = null;
+    try {
+      canvasRef.current?.releasePointerCapture(e.pointerId);
+    } catch {
+      /* pointer capture already released — nothing to clean up */
+    }
   }
 
   useEffect(() => {
@@ -122,30 +235,17 @@ export default function CVOverlay({
       }
 
       const zoneDetector = createZoneDetector(captureAndJudge);
+      setStatus('Tracking — step on a zone.');
 
       async function loop() {
         if (cancelled) return;
         const now = performance.now();
         const keypoints = await estimatePose(detector, video);
         zoneDetector.update(keypoints, video.videoWidth, video.videoHeight, now, calibrationRef.current);
-        drawOverlay(ctx, canvas.width, canvas.height, keypoints, calibrationRef.current);
+        drawOverlay(ctx, canvas.width, canvas.height, keypoints, calibrationRef.current, panelVisibleRef.current);
         raf = requestAnimationFrame(loop);
       }
       raf = requestAnimationFrame(loop);
-
-      if (autoCalibrate) {
-        // Quick Calibrate: one tap in Settings, no manual review. Give the
-        // camera a moment to auto-focus/expose before sampling colors.
-        setStatus('Quick calibrating…');
-        await new Promise((res) => setTimeout(res, 500));
-        if (cancelled) return;
-        calibrateEmptyMat();
-        setTimeout(() => {
-          if (!cancelled) onDoneCalibrating?.();
-        }, 900);
-      } else {
-        setStatus('Tracking — step on a zone.');
-      }
     }
 
     start().catch((err) => setStatus('Camera/model error: ' + err.message));
@@ -155,7 +255,7 @@ export default function CVOverlay({
       cancelAnimationFrame(raf);
       stream?.getTracks().forEach((t) => t.stop());
     };
-  }, [judgeLane, facingMode, autoCalibrate]);
+  }, [judgeLane, facingMode]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', width: '100%', maxWidth: 640, margin: '0 auto', ...style }}>
@@ -168,7 +268,19 @@ export default function CVOverlay({
         />
         <canvas
           ref={canvasRef}
-          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' }}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerUp}
+          style={{
+            position: 'absolute',
+            inset: 0,
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            pointerEvents: panelVisible ? 'auto' : 'none',
+            touchAction: panelVisible ? 'none' : 'auto',
+          }}
         />
       </div>
 
@@ -177,28 +289,26 @@ export default function CVOverlay({
         <p style={{ fontSize: 13, opacity: 0.8, margin: '0 0 6px' }}>{status}</p>
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-          {autoCalibrate ? (
-            <strong style={{ fontSize: 13 }}>Quick calibrating — no taps needed…</strong>
-          ) : calibrating ? (
-            <strong style={{ fontSize: 13 }}>Calibrate the zones, then hit Done</strong>
+          {calibrating ? (
+            <strong style={{ fontSize: 13 }}>Drag a box to move it, its corner to resize, then hit Done</strong>
           ) : (
             <button type="button" onClick={() => setPanelOpen((v) => !v)} style={{ fontSize: 12 }}>
               {panelOpen ? 'Hide' : 'Recalibrate'} zones
             </button>
           )}
-          {panelVisible && !autoCalibrate && (
+          {panelVisible && (
             <button type="button" onClick={resetAll} style={{ fontSize: 12 }}>
               Reset
             </button>
           )}
-          {calibrating && !autoCalibrate && (
+          {calibrating && (
             <button type="button" onClick={onDoneCalibrating} style={{ fontSize: 13, fontWeight: 700 }}>
               Done
             </button>
           )}
         </div>
 
-        {panelVisible && !autoCalibrate && (
+        {panelVisible && (
           <div style={{ marginTop: 8 }}>
             <button type="button" onClick={calibrateEmptyMat} style={{ fontSize: 13, fontWeight: 700, marginBottom: 8, width: '100%' }}>
               Auto-detect zones (empty mat)
@@ -226,52 +336,36 @@ export default function CVOverlay({
               />
             </label>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, maxHeight: '30vh', overflowY: 'auto' }}>
-              {LANES.map((lane) => (
-                <div key={lane.idx} style={{ border: `1px solid ${lane.color}`, borderRadius: 8, padding: 6 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, marginBottom: 4 }}>
-                    <span style={{ width: 10, height: 10, borderRadius: '50%', background: lane.color, display: 'inline-block' }} />
-                    {lane.name}
-                  </div>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11 }}>
-                    X
-                    <input
-                      type="range"
-                      min={-ZONE_OFFSET_RANGE}
-                      max={ZONE_OFFSET_RANGE}
-                      step={0.01}
-                      value={calibration.perLane[lane.idx].offsetX}
-                      onChange={(e) => updateZoneAdjust(lane.idx, { offsetX: Number(e.target.value) })}
-                      style={{ flex: 1 }}
-                    />
-                  </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11 }}>
-                    Y
-                    <input
-                      type="range"
-                      min={-ZONE_OFFSET_RANGE}
-                      max={ZONE_OFFSET_RANGE}
-                      step={0.01}
-                      value={calibration.perLane[lane.idx].offsetY}
-                      onChange={(e) => updateZoneAdjust(lane.idx, { offsetY: Number(e.target.value) })}
-                      style={{ flex: 1 }}
-                    />
-                  </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11 }}>
-                    Size
-                    <input
-                      type="range"
-                      min={ZONE_SCALE_MIN}
-                      max={ZONE_SCALE_MAX}
-                      step={0.05}
-                      value={calibration.perLane[lane.idx].scale}
-                      onChange={(e) => updateZoneAdjust(lane.idx, { scale: Number(e.target.value) })}
-                      style={{ flex: 1 }}
-                    />
-                  </label>
-                </div>
-              ))}
-            </div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, marginBottom: 8 }}>
+              Horizontal tilt
+              <input
+                type="range"
+                min={-ZONE_TILT_RANGE}
+                max={ZONE_TILT_RANGE}
+                step={0.02}
+                value={calibration.tiltX}
+                onChange={(e) => onChangeCalibration?.({ tiltX: Number(e.target.value) })}
+                style={{ flex: 1 }}
+              />
+            </label>
+
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, marginBottom: 8 }}>
+              Vertical tilt
+              <input
+                type="range"
+                min={-ZONE_TILT_RANGE}
+                max={ZONE_TILT_RANGE}
+                step={0.02}
+                value={calibration.tiltY}
+                onChange={(e) => onChangeCalibration?.({ tiltY: Number(e.target.value) })}
+                style={{ flex: 1 }}
+              />
+            </label>
+
+            <p style={{ fontSize: 11, opacity: 0.55, margin: 0 }}>
+              Tip: for a camera at an angle (not directly overhead), nudge the tilt sliders first, then drag each box
+              onto its tile.
+            </p>
           </div>
         )}
       </div>
@@ -280,21 +374,19 @@ export default function CVOverlay({
   );
 }
 
-function drawOverlay(ctx, w, h, keypoints, calibration) {
+function drawOverlay(ctx, w, h, keypoints, calibration, showHandles) {
   ctx.clearRect(0, 0, w, h);
 
   ctx.lineWidth = 3;
   ctx.font = 'bold 14px sans-serif';
-  for (const { laneIdx, box } of CV_ZONES) {
+  for (const { laneIdx } of CV_ZONES) {
     const lane = LANES[laneIdx];
     const detected = calibration.autoBoxes?.[laneIdx];
-    const defaultBox = calibration.rotate180 ? rotateZoneBox180(box) : box;
-    const baseBox = detected?.box ?? defaultBox;
     // Outline in whatever color was actually detected there, not the lane's
     // arbitrary game-arrow color — the tile you see and the box around it
     // should visually match during calibration.
     const outlineColor = detected?.colorHex ?? lane.color;
-    const b = effectiveZoneBox(baseBox, calibration.globalScale, calibration.perLane[laneIdx]);
+    const b = getLaneBox(laneIdx, calibration);
     const x = b.x0 * w;
     const y = b.y0 * h;
     const bw = (b.x1 - b.x0) * w;
@@ -303,6 +395,17 @@ function drawOverlay(ctx, w, h, keypoints, calibration) {
     ctx.strokeRect(x, y, bw, bh);
     ctx.fillStyle = outlineColor;
     ctx.fillText(lane.name, x + 6, y + 18);
+
+    if (showHandles) {
+      // Resize handle, bottom-right corner — only shown while calibrating,
+      // since dragging is disabled the rest of the time anyway.
+      ctx.fillStyle = outlineColor;
+      ctx.fillRect(x + bw - 9, y + bh - 9, 18, 18);
+      ctx.strokeStyle = 'rgba(0,0,0,0.6)';
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(x + bw - 9, y + bh - 9, 18, 18);
+      ctx.lineWidth = 3;
+    }
   }
 
   if (!keypoints) return;
