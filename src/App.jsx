@@ -11,13 +11,29 @@ export default function App() {
   const engineRef = useRef(null);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', width: '100%', overflow: 'hidden' }}>
-      {phase === 'playing' && <GameEngine ref={engineRef} style={{ flex: '1 1 0', minHeight: 0 }} />}
+    <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', height: '100dvh', width: '100%', overflow: 'hidden' }}>
+      {phase === 'playing' && <GameEngine ref={engineRef} style={{ flex: '1 1 auto', minHeight: 0 }} />}
       <CVOverlay
         judgeLane={(laneIdx) => engineRef.current?.judgeLane(laneIdx)}
         calibrating={phase === 'calibrating'}
         onDoneCalibrating={() => setPhase('playing')}
-        style={{ flex: phase === 'calibrating' ? '1 1 auto' : '1 1 0', minHeight: 0 }}
+        compact={phase === 'playing'}
+        style={
+          phase === 'calibrating'
+            ? { flex: '1 1 auto', minHeight: 0 }
+            : {
+                position: 'absolute',
+                bottom: 12,
+                right: 12,
+                width: 110,
+                height: 150,
+                zIndex: 5,
+                borderRadius: 10,
+                overflow: 'hidden',
+                boxShadow: '0 2px 12px rgba(0,0,0,0.6)',
+                border: '1px solid rgba(255,255,255,0.25)',
+              }
+        }
       />
     </div>
   );

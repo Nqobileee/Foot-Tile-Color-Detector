@@ -10,6 +10,7 @@ import {
   ZONE_GLOBAL_SCALE_MIN,
   ZONE_GLOBAL_SCALE_MAX,
   effectiveZoneBox,
+  rotateZoneBox180,
 } from '../../game/constants.js';
 import { loadPoseModel, estimatePose } from './poseModel.js';
 import { createZoneDetector } from './zoneDetector.js';
@@ -19,7 +20,7 @@ import { detectZonesFromFrame } from './colorCalibration.js';
 // as a self-contained input adapter component. Renders the webcam feed with
 // a debug overlay (zone boxes + skeleton) and drives judgeLane(laneIdx) —
 // the game engine behind it has no idea a camera is involved.
-export default function CVOverlay({ judgeLane, style, calibrating = false, onDoneCalibrating }) {
+export default function CVOverlay({ judgeLane, style, calibrating = false, onDoneCalibrating, compact = false }) {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const [status, setStatus] = useState('Loading pose model…');
@@ -27,10 +28,11 @@ export default function CVOverlay({ judgeLane, style, calibrating = false, onDon
   const [globalScale, setGlobalScale] = useState(ZONE_GLOBAL_SCALE_DEFAULT);
   const [zoneAdjust, setZoneAdjust] = useState(() => LANES.map(() => ({ ...ZONE_ADJUST_DEFAULT })));
   const [autoBoxes, setAutoBoxes] = useState(null); // per-lane detected box, or null per-lane if not found
-  const calibrationRef = useRef({ globalScale, perLane: zoneAdjust, autoBoxes });
+  const [rotate180, setRotate180] = useState(false); // back camera facing the player vs. facing away
+  const calibrationRef = useRef({ globalScale, perLane: zoneAdjust, autoBoxes, rotate180 });
   useEffect(() => {
-    calibrationRef.current = { globalScale, perLane: zoneAdjust, autoBoxes };
-  }, [globalScale, zoneAdjust, autoBoxes]);
+    calibrationRef.current = { globalScale, perLane: zoneAdjust, autoBoxes, rotate180 };
+  }, [globalScale, zoneAdjust, autoBoxes, rotate180]);
 
   const panelVisible = calibrating || panelOpen;
 
@@ -45,7 +47,7 @@ export default function CVOverlay({ judgeLane, style, calibrating = false, onDon
   }
 
   function calibrateEmptyMat() {
-    const detected = detectZonesFromFrame(videoRef.current);
+    const detected = detectZonesFromFrame(videoRef.current, rotate180);
     setAutoBoxes(detected);
     const found = LANES.filter((l) => detected[l.idx]).map((l) => l.name);
     const missing = LANES.filter((l) => !detected[l.idx]).map((l) => l.name);
@@ -119,6 +121,7 @@ export default function CVOverlay({ judgeLane, style, calibrating = false, onDon
         />
       </div>
 
+      {!compact && (
       <div style={{ flex: '0 0 auto', padding: '6px 4px' }}>
         <p style={{ fontSize: 13, opacity: 0.8, margin: '0 0 6px' }}>{status}</p>
 
@@ -147,6 +150,11 @@ export default function CVOverlay({ judgeLane, style, calibrating = false, onDon
             <button type="button" onClick={calibrateEmptyMat} style={{ fontSize: 13, fontWeight: 700, marginBottom: 8, width: '100%' }}>
               Auto-detect zones (empty mat)
             </button>
+
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, marginBottom: 8 }}>
+              <input type="checkbox" checked={rotate180} onChange={(e) => setRotate180(e.target.checked)} />
+              Camera facing me (invert up/down/left/right)
+            </label>
 
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, marginBottom: 8 }}>
               All zones size: {Math.round(globalScale * 100)}%
@@ -210,6 +218,7 @@ export default function CVOverlay({ judgeLane, style, calibrating = false, onDon
           </div>
         )}
       </div>
+      )}
     </div>
   );
 }
@@ -222,7 +231,8 @@ function drawOverlay(ctx, w, h, keypoints, calibration) {
   for (const { laneIdx, box } of CV_ZONES) {
     const lane = LANES[laneIdx];
     const detected = calibration.autoBoxes?.[laneIdx];
-    const baseBox = detected?.box ?? box;
+    const defaultBox = calibration.rotate180 ? rotateZoneBox180(box) : box;
+    const baseBox = detected?.box ?? defaultBox;
     // Outline in whatever color was actually detected there, not the lane's
     // arbitrary game-arrow color — the tile you see and the box around it
     // should visually match during calibration.

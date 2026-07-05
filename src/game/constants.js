@@ -61,6 +61,16 @@ export function effectiveZoneBox(box, globalScale, laneAdjust) {
   return adjustedZoneBox(scaledZoneBox(box, globalScale), laneAdjust);
 }
 
+// Some camera mountings show the mat rotated 180° from how the player
+// standing on it perceives up/down/left/right (e.g. camera facing the
+// player from the far side, or mounted upside-down). This remaps a default
+// zone's reference position accordingly, without touching LANES or the
+// actual detected color boxes (which are already wherever the camera saw
+// them — only the *semantic* up/down/left/right reference needs rotating).
+export function rotateZoneBox180(box) {
+  return { x0: 1 - box.x1, x1: 1 - box.x0, y0: 1 - box.y1, y1: 1 - box.y0 };
+}
+
 // Render loop / note timing
 export const SCROLL_SPEED_PX_PER_SEC = 140;
 export const NOTE_RADIUS = 22;

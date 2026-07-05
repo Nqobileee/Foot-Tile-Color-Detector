@@ -1,4 +1,4 @@
-import { CV_ZONES } from '../../game/constants.js';
+import { CV_ZONES, rotateZoneBox180 } from '../../game/constants.js';
 
 const NONE = -1;
 const COLOR_FAMILIES = 4; // red, blue, yellow, green — independent of lane identity
@@ -40,9 +40,11 @@ function boxCenter(b) {
 // box, then assigns each to whichever zone position (left/up/down/right) its
 // box center is closest to — NOT by assuming a fixed color-to-position
 // layout, since that depends entirely on how this camera happens to be
-// mounted. Returns a per-laneIdx array of { box, colorHex } or null where no
+// mounted. rotate180 flips which default position means what (see
+// rotateZoneBox180) for cameras mounted facing the player / upside-down.
+// Returns a per-laneIdx array of { box, colorHex } or null where no
 // confident match was found.
-export function detectZonesFromFrame(video) {
+export function detectZonesFromFrame(video, rotate180 = false) {
   const work = document.createElement('canvas');
   const aspect = video.videoHeight / video.videoWidth;
   work.width = SAMPLE_SIZE;
@@ -83,7 +85,8 @@ export function detectZonesFromFrame(video) {
 
   // Greedy nearest-match: each position zone claims whichever unclaimed
   // detected color blob's center is closest to that zone's default center.
-  for (const { laneIdx, box: defaultBox } of CV_ZONES) {
+  for (const { laneIdx, box: rawDefaultBox } of CV_ZONES) {
+    const defaultBox = rotate180 ? rotateZoneBox180(rawDefaultBox) : rawDefaultBox;
     const defCenter = boxCenter(defaultBox);
     let best = null;
     let bestDist = Infinity;
