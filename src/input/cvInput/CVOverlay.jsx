@@ -35,6 +35,7 @@ export default function CVOverlay({
   calibration = defaultZoneCalibration(),
   onChangeCalibration,
   facingMode = 'environment',
+  autoCalibrate = false,
 }) {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
@@ -121,7 +122,6 @@ export default function CVOverlay({
       }
 
       const zoneDetector = createZoneDetector(captureAndJudge);
-      setStatus('Tracking — step on a zone.');
 
       async function loop() {
         if (cancelled) return;
@@ -132,6 +132,20 @@ export default function CVOverlay({
         raf = requestAnimationFrame(loop);
       }
       raf = requestAnimationFrame(loop);
+
+      if (autoCalibrate) {
+        // Quick Calibrate: one tap in Settings, no manual review. Give the
+        // camera a moment to auto-focus/expose before sampling colors.
+        setStatus('Quick calibrating…');
+        await new Promise((res) => setTimeout(res, 500));
+        if (cancelled) return;
+        calibrateEmptyMat();
+        setTimeout(() => {
+          if (!cancelled) onDoneCalibrating?.();
+        }, 900);
+      } else {
+        setStatus('Tracking — step on a zone.');
+      }
     }
 
     start().catch((err) => setStatus('Camera/model error: ' + err.message));
@@ -141,7 +155,7 @@ export default function CVOverlay({
       cancelAnimationFrame(raf);
       stream?.getTracks().forEach((t) => t.stop());
     };
-  }, [judgeLane, facingMode]);
+  }, [judgeLane, facingMode, autoCalibrate]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', width: '100%', maxWidth: 640, margin: '0 auto', ...style }}>
@@ -163,26 +177,28 @@ export default function CVOverlay({
         <p style={{ fontSize: 13, opacity: 0.8, margin: '0 0 6px' }}>{status}</p>
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-          {calibrating ? (
+          {autoCalibrate ? (
+            <strong style={{ fontSize: 13 }}>Quick calibrating — no taps needed…</strong>
+          ) : calibrating ? (
             <strong style={{ fontSize: 13 }}>Calibrate the zones, then hit Done</strong>
           ) : (
             <button type="button" onClick={() => setPanelOpen((v) => !v)} style={{ fontSize: 12 }}>
               {panelOpen ? 'Hide' : 'Recalibrate'} zones
             </button>
           )}
-          {panelVisible && (
+          {panelVisible && !autoCalibrate && (
             <button type="button" onClick={resetAll} style={{ fontSize: 12 }}>
               Reset
             </button>
           )}
-          {calibrating && (
+          {calibrating && !autoCalibrate && (
             <button type="button" onClick={onDoneCalibrating} style={{ fontSize: 13, fontWeight: 700 }}>
               Done
             </button>
           )}
         </div>
 
-        {panelVisible && (
+        {panelVisible && !autoCalibrate && (
           <div style={{ marginTop: 8 }}>
             <button type="button" onClick={calibrateEmptyMat} style={{ fontSize: 13, fontWeight: 700, marginBottom: 8, width: '100%' }}>
               Auto-detect zones (empty mat)

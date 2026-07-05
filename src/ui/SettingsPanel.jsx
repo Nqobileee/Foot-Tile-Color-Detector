@@ -4,7 +4,15 @@ const CAMERAS = [
   { value: 'user', label: 'Front camera' },
 ];
 
-export default function SettingsPanel({ durationSec, onChangeDuration, facingMode, onChangeFacingMode, onCalibrate, onClose }) {
+export default function SettingsPanel({
+  durationSec,
+  onChangeDuration,
+  facingMode,
+  onChangeFacingMode,
+  onCalibrate,
+  onQuickCalibrate,
+  onClose,
+}) {
   return (
     <div
       onClick={onClose}
@@ -85,6 +93,24 @@ export default function SettingsPanel({ durationSec, onChangeDuration, facingMod
 
         <button
           type="button"
+          onClick={onQuickCalibrate}
+          style={{
+            display: 'block',
+            width: '100%',
+            padding: '12px',
+            borderRadius: 12,
+            border: '1px solid rgba(31,174,74,0.5)',
+            background: 'rgba(31,174,74,0.15)',
+            fontWeight: 700,
+            cursor: 'pointer',
+            marginBottom: 10,
+          }}
+        >
+          Quick Calibrate
+        </button>
+
+        <button
+          type="button"
           onClick={onCalibrate}
           style={{
             display: 'block',
@@ -98,7 +124,7 @@ export default function SettingsPanel({ durationSec, onChangeDuration, facingMod
             marginBottom: 10,
           }}
         >
-          Calibrate Camera
+          Calibrate Camera (manual)
         </button>
 
         <button
