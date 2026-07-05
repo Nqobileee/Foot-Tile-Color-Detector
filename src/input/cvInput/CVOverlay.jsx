@@ -20,9 +20,13 @@ import { detectZonesFromFrame } from './colorCalibration.js';
 // as a self-contained input adapter component. Renders the webcam feed with
 // a debug overlay (zone boxes + skeleton) and drives judgeLane(laneIdx) —
 // the game engine behind it has no idea a camera is involved.
-export default function CVOverlay({ judgeLane, style, calibrating = false, onDoneCalibrating, compact = false }) {
+export default function CVOverlay({ judgeLane, style, calibrating = false, onDoneCalibrating, compact = false, onCapture }) {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
+  const onCaptureRef = useRef(onCapture);
+  useEffect(() => {
+    onCaptureRef.current = onCapture;
+  }, [onCapture]);
   const [status, setStatus] = useState('Loading pose model…');
   const [panelOpen, setPanelOpen] = useState(false);
   const [globalScale, setGlobalScale] = useState(ZONE_GLOBAL_SCALE_DEFAULT);
@@ -83,7 +87,29 @@ export default function CVOverlay({ judgeLane, style, calibrating = false, onDon
       canvas.height = video.videoHeight;
       const ctx = canvas.getContext('2d');
 
-      const zoneDetector = createZoneDetector(judgeLane);
+      // Separate offscreen canvas for training captures — the display
+      // canvas above has the zone-box/skeleton overlay drawn on top of it,
+      // which we don't want baked into the saved training images.
+      const captureCanvas = document.createElement('canvas');
+      captureCanvas.width = video.videoWidth;
+      captureCanvas.height = video.videoHeight;
+      const captureCtx = captureCanvas.getContext('2d');
+
+      function captureAndJudge(laneIdx) {
+        if (onCaptureRef.current) {
+          captureCtx.drawImage(video, 0, 0, captureCanvas.width, captureCanvas.height);
+          captureCanvas.toBlob(
+            (blob) => {
+              if (blob) onCaptureRef.current?.(blob, LANES[laneIdx].colorName);
+            },
+            'image/jpeg',
+            0.85
+          );
+        }
+        judgeLane(laneIdx);
+      }
+
+      const zoneDetector = createZoneDetector(captureAndJudge);
       setStatus('Tracking — step on a zone.');
 
       async function loop() {

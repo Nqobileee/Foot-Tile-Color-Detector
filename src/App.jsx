@@ -7,6 +7,7 @@ import SettingsPanel from './ui/SettingsPanel.jsx';
 import GameOverScreen from './ui/GameOverScreen.jsx';
 import { GAME_MODES } from './content/modes.js';
 import { loadDurationSec, saveDurationSec, loadHighScores, saveHighScores } from './content/storage.js';
+import { downloadTrainingZip } from './content/exportSession.js';
 
 // Computer vision is the only input adapter now: Layers 1-3 (webcam, pose
 // estimation, zone detection) always drive Layer 4 (GameEngine) through
@@ -22,6 +23,7 @@ export default function App() {
   const [lastResult, setLastResult] = useState(null); // { score, isNewHighScore }
   const calibrateReturnTo = useRef('home');
   const engineRef = useRef(null);
+  const capturesRef = useRef([]); // { blob, label, timestamp }[] — collected during play, for training
 
   function handleChangeDuration(sec) {
     setDurationSec(sec);
@@ -38,9 +40,14 @@ export default function App() {
     setPhase('wiki');
   }
 
+  function beginRound() {
+    capturesRef.current = [];
+    setPhase('playing');
+  }
+
   function handleStartGame() {
     if (calibrated) {
-      setPhase('playing');
+      beginRound();
     } else {
       calibrateReturnTo.current = 'playing';
       setPhase('calibrating');
@@ -49,7 +56,12 @@ export default function App() {
 
   function handleDoneCalibrating() {
     setCalibrated(true);
-    setPhase(calibrateReturnTo.current);
+    if (calibrateReturnTo.current === 'playing') beginRound();
+    else setPhase('home');
+  }
+
+  function handleCapture(blob, label) {
+    capturesRef.current.push({ blob, label, timestamp: Date.now() });
   }
 
   function handleGameOver(score) {
@@ -62,6 +74,10 @@ export default function App() {
     }
     setLastResult({ score, isNewHighScore });
     setPhase('gameover');
+  }
+
+  function handleDownload() {
+    downloadTrainingZip({ mode: selectedMode, score: lastResult?.score ?? 0, durationSec, captures: capturesRef.current });
   }
 
   const showCamera = phase === 'calibrating' || phase === 'playing';
@@ -80,7 +96,9 @@ export default function App() {
           score={lastResult.score}
           highScore={highScores[selectedMode.id] ?? 0}
           isNewHighScore={lastResult.isNewHighScore}
-          onPlayAgain={() => setPhase('playing')}
+          captureCount={capturesRef.current.length}
+          onDownload={handleDownload}
+          onPlayAgain={beginRound}
           onHome={() => setPhase('home')}
         />
       )}
@@ -95,6 +113,7 @@ export default function App() {
           calibrating={phase === 'calibrating'}
           onDoneCalibrating={handleDoneCalibrating}
           compact={phase === 'playing'}
+          onCapture={phase === 'playing' ? handleCapture : undefined}
           style={
             phase === 'calibrating'
               ? { flex: '1 1 auto', minHeight: 0 }

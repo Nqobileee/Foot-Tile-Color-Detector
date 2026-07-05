@@ -1,6 +1,6 @@
 import StarsBackground from './StarsBackground.jsx';
 
-export default function GameOverScreen({ mode, score, highScore, isNewHighScore, onPlayAgain, onHome }) {
+export default function GameOverScreen({ mode, score, highScore, isNewHighScore, captureCount, onDownload, onPlayAgain, onHome }) {
   return (
     <div style={{ position: 'relative', height: '100%', width: '100%', overflowY: 'auto' }}>
       <StarsBackground />
@@ -41,6 +41,26 @@ export default function GameOverScreen({ mode, score, highScore, isNewHighScore,
           <p style={{ fontWeight: 700, color: '#F4D913', margin: '0 0 24px' }}>New high score!</p>
         ) : (
           <p style={{ opacity: 0.65, margin: '0 0 24px' }}>Best: {highScore}</p>
+        )}
+
+        {captureCount > 0 && (
+          <button
+            type="button"
+            onClick={onDownload}
+            style={{
+              width: '100%',
+              padding: '14px',
+              borderRadius: 14,
+              border: '1px solid rgba(31,174,74,0.5)',
+              background: 'rgba(31,174,74,0.15)',
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: 'pointer',
+              marginBottom: 10,
+            }}
+          >
+            Download Training Data ({captureCount} images)
+          </button>
         )}
 
         <button

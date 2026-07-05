@@ -1,10 +1,10 @@
 // Layer 4 shared config. Lane order matches the physical mat and the
 // Input Adapter Comparison table in architecture.md (ArrowLeft/Up/Right/Down).
 export const LANES = [
-  { idx: 0, name: 'left', key: 'ArrowLeft', gamepadButton: 14, color: '#E31B4C', arrowAngle: Math.PI }, // red ←
-  { idx: 1, name: 'up', key: 'ArrowUp', gamepadButton: 12, color: '#1CA7EC', arrowAngle: -Math.PI / 2 }, // blue ↑
-  { idx: 2, name: 'down', key: 'ArrowDown', gamepadButton: 13, color: '#F4D913', arrowAngle: Math.PI / 2 }, // yellow ↓
-  { idx: 3, name: 'right', key: 'ArrowRight', gamepadButton: 15, color: '#1FAE4A', arrowAngle: 0 }, // green →
+  { idx: 0, name: 'left', key: 'ArrowLeft', gamepadButton: 14, color: '#E31B4C', colorName: 'red', arrowAngle: Math.PI }, // red ←
+  { idx: 1, name: 'up', key: 'ArrowUp', gamepadButton: 12, color: '#1CA7EC', colorName: 'blue', arrowAngle: -Math.PI / 2 }, // blue ↑
+  { idx: 2, name: 'down', key: 'ArrowDown', gamepadButton: 13, color: '#F4D913', colorName: 'yellow', arrowAngle: Math.PI / 2 }, // yellow ↓
+  { idx: 3, name: 'right', key: 'ArrowRight', gamepadButton: 15, color: '#1FAE4A', colorName: 'green', arrowAngle: 0 }, // green →
 ];
 
 export const LANE_COUNT = LANES.length;
