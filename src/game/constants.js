@@ -9,14 +9,18 @@ export const LANES = [
 
 export const LANE_COUNT = LANES.length;
 
-// Normalized (0-1) zone bounding boxes for the CV input path, laid out as a
-// plus-shaped mat: up top, left/right to the sides, down at the bottom.
+// Normalized (0-1) zone bounding boxes for the CV input path. These match a
+// real reference photo of the mat shot from its typical camera angle/mount
+// (phone tilted, not directly overhead) — since red/blue/yellow/green sit at
+// right/bottom/top/left in that shot, that's baked in directly here rather
+// than relying on the rotate180 toggle. Still fully adjustable per-lane by
+// dragging, or globally via the tilt/size sliders, for any other mounting.
 // { x0, y0, x1, y1 } in normalized video coordinates.
 export const CV_ZONES = [
-  { laneIdx: 0, box: { x0: 0.0, y0: 0.35, x1: 0.33, y1: 0.75 } }, // left
-  { laneIdx: 1, box: { x0: 0.33, y0: 0.0, x1: 0.67, y1: 0.4 } }, // up
-  { laneIdx: 2, box: { x0: 0.33, y0: 0.6, x1: 0.67, y1: 1.0 } }, // down
-  { laneIdx: 3, box: { x0: 0.67, y0: 0.35, x1: 1.0, y1: 0.75 } }, // right
+  { laneIdx: 0, box: { x0: 0.58, y0: 0.63, x1: 0.855, y1: 0.76 } }, // left (red)
+  { laneIdx: 1, box: { x0: 0.34, y0: 0.76, x1: 0.64, y1: 0.91 } }, // up (blue)
+  { laneIdx: 2, box: { x0: 0.37, y0: 0.535, x1: 0.63, y1: 0.63 } }, // down (yellow)
+  { laneIdx: 3, box: { x0: 0.12, y0: 0.63, x1: 0.4, y1: 0.76 } }, // right (green)
 ];
 
 // Per-lane, user-adjustable calibration for the CV zone grid. A camera
@@ -115,8 +119,8 @@ export const STEP_FLASH_DURATION_MS = 900; // how long the column glow lingers
 
 // Zone/step detection tuning (Layer 3)
 export const STEP_DETECTION = {
-  minConfidence: 0.3, // MoveNet keypoint score required to trust an ankle
-  dwellFramesRequired: 2, // consecutive in-zone frames before counting as "down"
+  minConfidence: 0.5, // MoveNet keypoint score required to trust an ankle/knee — low-confidence guesses caused false triggers
+  dwellFramesRequired: 3, // consecutive in-zone frames before counting as "down"
   cooldownMs: 220, // minimum time between repeat hits on the same lane
   minDownwardVelocity: 0.0025, // normalized-units/ms; filters out slow drifts
 };

@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import GameEngine from './game/GameEngine.jsx';
 import CVOverlay from './input/cvInput/CVOverlay.jsx';
 import HomePage from './ui/HomePage.jsx';
@@ -37,6 +37,11 @@ export default function App() {
   const [lastResult, setLastResult] = useState(null); // { score, isNewHighScore }
   const engineRef = useRef(null);
   const capturesRef = useRef([]); // { blob, label, timestamp }[] — collected during play, for training
+
+  // Stable identity (engineRef never changes) — CVOverlay's camera-setup
+  // effect depends on this, so a fresh function every render would tear
+  // down and reconnect the camera on every single calibration tweak.
+  const judgeLane = useCallback((laneIdx) => engineRef.current?.judgeLane(laneIdx), []);
 
   function handleChangeDuration(sec) {
     setDurationSec(sec);
@@ -159,7 +164,7 @@ export default function App() {
 
       {showCamera && (
         <CVOverlay
-          judgeLane={(laneIdx) => engineRef.current?.judgeLane(laneIdx)}
+          judgeLane={judgeLane}
           calibrating={phase === 'calibrating'}
           onDoneCalibrating={handleDoneCalibrating}
           compact={phase === 'playing'}
