@@ -40,116 +40,32 @@ function drawArrow(ctx, cx, cy, r, angle, color) {
   ctx.restore();
 }
 
-function contrastTextColor(hex) {
-  const n = parseInt(hex.slice(1), 16);
-  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
-  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-  return luminance > 0.6 ? '#1a1a1a' : '#ffffff';
-}
-
-function roundRectPath(ctx, x, y, w, h, r) {
-  ctx.beginPath();
-  ctx.moveTo(x + r, y);
-  ctx.arcTo(x + w, y, x + w, y + h, r);
-  ctx.arcTo(x + w, y + h, x, y + h, r);
-  ctx.arcTo(x, y + h, x, y, r);
-  ctx.arcTo(x, y, x + w, y, r);
-  ctx.closePath();
-}
-
-// Nutrition mode's icons, indexed by laneIdx (0=Protein, 1=Minerals,
-// 2=Fats, 3=Vitamins — see content/modes.js's legend order).
-const NUTRIENT_ICONS = [
-  // Protein: dumbbell
-  (ctx, cx, cy, r, color) => {
-    ctx.save();
-    ctx.translate(cx, cy);
-    ctx.fillStyle = color;
-    const barW = r * 1.1, barH = r * 0.24;
-    ctx.fillRect(-barW / 2, -barH / 2, barW, barH);
-    const weightR = r * 0.32;
-    ctx.beginPath();
-    ctx.arc(-barW / 2, 0, weightR, 0, Math.PI * 2);
-    ctx.arc(barW / 2, 0, weightR, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-  },
-  // Minerals: gem
-  (ctx, cx, cy, r, color) => {
-    ctx.save();
-    ctx.translate(cx, cy);
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    ctx.moveTo(0, -r * 0.9);
-    ctx.lineTo(r * 0.7, -r * 0.1);
-    ctx.lineTo(0, r * 0.9);
-    ctx.lineTo(-r * 0.7, -r * 0.1);
-    ctx.closePath();
-    ctx.fill();
-    ctx.restore();
-  },
-  // Fats: droplet
-  (ctx, cx, cy, r, color) => {
-    ctx.save();
-    ctx.translate(cx, cy);
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    ctx.moveTo(0, -r * 0.9);
-    ctx.quadraticCurveTo(r * 0.75, r * 0.3, 0, r * 0.9);
-    ctx.quadraticCurveTo(-r * 0.75, r * 0.3, 0, -r * 0.9);
-    ctx.closePath();
-    ctx.fill();
-    ctx.restore();
-  },
-  // Vitamins: capsule
-  (ctx, cx, cy, r, color) => {
-    ctx.save();
-    ctx.translate(cx, cy);
-    ctx.rotate(Math.PI / 4);
-    const w = r * 1.4, h = r * 0.65;
-    roundRectPath(ctx, -w / 2, -h / 2, w, h, h / 2);
-    ctx.fillStyle = color;
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(0,0,0,0.35)';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(0, -h / 2);
-    ctx.lineTo(0, h / 2);
-    ctx.stroke();
-    ctx.restore();
-  },
-];
-
-// Bible and the other themed modes: a colored label chip instead of an
-// arrow or icon — their lanes stand for named concepts (Prophet, Mars, ...).
-function drawLabelChip(ctx, cx, cy, r, text, color) {
+// Themed modes: big bold text, no background chip, no lane color — the
+// lane's column position already carries the color meaning, so the word
+// itself stays neutral (white) with a soft dark outline for legibility.
+// Font size scales down for longer words so they don't overrun the lane.
+function drawLabelText(ctx, cx, cy, r, text) {
+  const fontSize = Math.round(Math.max(15, Math.min(27, (r * 4.6) / Math.max(text.length, 4))));
   ctx.save();
-  ctx.font = 'bold 14px sans-serif';
-  const paddingX = 9;
-  const textWidth = ctx.measureText(text).width;
-  const chipW = Math.min(textWidth + paddingX * 2, r * 3.2);
-  const chipH = r * 0.85;
-  ctx.translate(cx, cy);
-  roundRectPath(ctx, -chipW / 2, -chipH / 2, chipW, chipH, chipH / 2);
-  ctx.fillStyle = color;
-  ctx.fill();
-  ctx.fillStyle = contrastTextColor(color);
+  ctx.font = `800 ${fontSize}px sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(text, 0, 1);
+  ctx.lineWidth = 4;
+  ctx.strokeStyle = 'rgba(0,0,0,0.75)';
+  ctx.strokeText(text, cx, cy);
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText(text, cx, cy);
   ctx.restore();
 }
 
 // Picks the right visual per mode: Normal keeps plain directional arrows;
-// Nutrition shows a nutrient icon; every other themed mode shows its
-// concept's name instead.
-function renderNote(ctx, cx, cy, r, lane, mode) {
+// every themed mode shows its concept's name (a specific example — "Peter",
+// not "Apostle" — where the mode defines a names pool) as bold text instead.
+function renderNote(ctx, cx, cy, r, lane, mode, text) {
   if (!mode || mode.id === 'normal') {
     drawArrow(ctx, cx, cy, r, lane.arrowAngle, lane.color);
-  } else if (mode.id === 'nutrition') {
-    NUTRIENT_ICONS[lane.idx](ctx, cx, cy, r, lane.color);
   } else {
-    drawLabelChip(ctx, cx, cy, r, mode.legend[lane.idx], lane.color);
+    drawLabelText(ctx, cx, cy, r, text);
   }
 }
 
@@ -217,6 +133,12 @@ const GameEngine = forwardRef(function GameEngine({ style, durationSec = 60, onG
       return (canvas.height / SCROLL_SPEED_PX_PER_SEC) * 1000;
     }
 
+    function pickNoteText(laneIdx) {
+      const pool = mode?.names?.[laneIdx];
+      if (pool?.length) return pool[Math.floor(Math.random() * pool.length)];
+      return mode?.legend?.[laneIdx];
+    }
+
     function spawnNote(now) {
       const laneIdx = Math.floor(Math.random() * LANE_COUNT);
       notesRef.current.push({
@@ -225,6 +147,7 @@ const GameEngine = forwardRef(function GameEngine({ style, durationSec = 60, onG
         spawnTime: now,
         hitTime: now + travelTimeMs(),
         hit: false,
+        text: pickNoteText(laneIdx),
       });
     }
 
@@ -260,7 +183,7 @@ const GameEngine = forwardRef(function GameEngine({ style, durationSec = 60, onG
         const y = progress * h;
         const x = note.laneIdx * laneW + laneW / 2;
         const lane = LANES[note.laneIdx];
-        renderNote(ctx, x, y, NOTE_RADIUS * 1.3, lane, mode);
+        renderNote(ctx, x, y, NOTE_RADIUS * 1.3, lane, mode, note.text);
       }
 
       const flash = stepFlashRef.current;
